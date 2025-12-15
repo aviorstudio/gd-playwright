@@ -2,7 +2,7 @@
 extends EditorPlugin
 
 const AUTOLOAD_NAME := "PlaywrightService"
-const AUTOLOAD_SCRIPT := "playwright_service.gd"
+const AUTOLOAD_SCRIPT := "autoload.gd"
 
 var _added_autoload: bool = false
 

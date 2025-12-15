@@ -12,7 +12,7 @@ This directory is meant to be linked/copied into a Godot project's `addons/` fol
 
 Either:
 - Enable the plugin in Godot: `Project Settings -> Plugins -> GD Playwright Client`, or
-- Add `playwright_service.gd` as an Autoload named `PlaywrightService`.
+- Add `autoload.gd` as an Autoload named `PlaywrightService`.
 
 ## Notes
 
