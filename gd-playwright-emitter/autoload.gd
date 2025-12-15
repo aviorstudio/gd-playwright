@@ -1,1 +1,1 @@
-extends "res://addons/@gd-playwright-emitter/src/playwright_service.gd"
+extends "src/playwright_service.gd"
