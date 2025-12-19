@@ -2,7 +2,7 @@
 
 Godot-side Playwright bridge for web exports:
 - Emits structured events into `window.godotEvents` and dispatches `CustomEvent('godot-event')`.
-- (Optional) exposes minimal test hooks (ex: `window.testLogin(...)`) when running in test mode.
+- Emits a `service_ready` event when `gd_playwright/test_mode` is enabled.
 
 ## Install
 
@@ -17,4 +17,4 @@ Either:
 ## Notes
 
 - The bridge no-ops when not running a web build (`OS.has_feature("web") == false`).
-- Event emission is gated by `EnvService.test_mode` if an autoload named `EnvService` exists; otherwise it falls back to `OS.is_debug_build()`.
+- Event emission is enabled when either `gd_playwright/test_mode` or `gd_playwright/enabled` is `true`, otherwise it falls back to `OS.is_debug_build()`.

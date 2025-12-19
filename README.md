@@ -1,4 +1,5 @@
 # gd-playwright
 
 Packages:
-- `gd-playwright-client/`: Godot web test bridge (event emission + minimal test hooks).
+- `emitter/`: Godot web test bridge (event emission into `window.godotEvents`).
+- `listener/`: placeholder for future non-Godot tooling.
