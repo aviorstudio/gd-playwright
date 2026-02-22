@@ -1,3 +1,4 @@
+class_name PlaywrightServiceModule
 extends Node
 
 const SETTINGS_PREFIX := "gd_playwright/"

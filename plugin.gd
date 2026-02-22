@@ -12,10 +12,8 @@ func _enter_tree() -> void:
 		_added_autoload = false
 		return
 
-	var self_script: Script = get_script()
-	var base_dir: String = str(self_script.resource_path).get_base_dir()
-	var autoload_path: String = base_dir.path_join(AUTOLOAD_SCRIPT)
-	add_autoload_singleton(AUTOLOAD_NAME, autoload_path)
+	var base_dir: String = str(get_script().resource_path).get_base_dir()
+	add_autoload_singleton(AUTOLOAD_NAME, base_dir.path_join(AUTOLOAD_SCRIPT))
 	_added_autoload = true
 
 func _exit_tree() -> void:
