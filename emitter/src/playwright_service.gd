@@ -1,6 +1,8 @@
+## Playwright event bridge for exposing Godot runtime events to browser tests.
 class_name PlaywrightServiceModule
 extends Node
 
+## Runtime configuration for browser event emission behavior.
 class PlaywrightConfig extends RefCounted:
 	var enabled: bool = false
 	var test_mode: bool = false
