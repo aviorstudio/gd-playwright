@@ -1,6 +1,6 @@
 extends SceneTree
 
-const PlaywrightServiceModule = preload("res://emitter/src/playwright_service.gd")
+const PlaywrightServiceModule = preload("res://src/playwright_service.gd")
 
 class FakePlaywrightService extends PlaywrightServiceModule:
 	var captured_event_name: String = ""
@@ -41,7 +41,7 @@ func _test_emit_event_and_alias_delegate_to_browser_emitter(failures: Array[Stri
 
 func _test_configure_retains_buffer_and_flag_settings(failures: Array[String]) -> void:
 	var service := PlaywrightServiceModule.new()
-	var config := PlaywrightServiceModule.PlaywrightConfig.new(true, true, false, 42, 17)
+	var config := PlaywrightServiceModule.PlaywrightConfig.new(true, true, false, "[PW]", 20, 10)
 	service.configure(config)
 	var effective: PlaywrightServiceModule.PlaywrightConfig = service.get_config()
 
@@ -49,8 +49,10 @@ func _test_configure_retains_buffer_and_flag_settings(failures: Array[String]) -
 		failures.append("Expected configure to retain enabled and test_mode flags")
 	if effective.log_events:
 		failures.append("Expected configure to retain log_events=false")
-	if effective.buffer_max != 42:
+	if effective.log_prefix != "[PW]":
+		failures.append("Expected configured log_prefix to be retained")
+	if effective.buffer_max != 20:
 		failures.append("Expected configure to retain buffer_max setting")
-	if effective.buffer_trim != 17:
+	if effective.buffer_trim != 10:
 		failures.append("Expected configure to retain buffer_trim setting")
 	service.free()
