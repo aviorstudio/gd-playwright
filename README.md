@@ -32,7 +32,7 @@ No required project settings. Optional defaults are resolved from plugin runtime
 
 ## Testing
 
-`./run_tests.sh`
+`./tests/test.sh`
 
 ## License
 
