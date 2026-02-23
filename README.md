@@ -1,6 +1,6 @@
 # gd-playwright
 
-Monorepo for Playwright integration with a Godot event emitter addon.
+Playwright integration with a Godot event emitter addon.
 
 ## Installation
 
@@ -8,22 +8,21 @@ Monorepo for Playwright integration with a Godot event emitter addon.
 `gdpm install @aviorstudio/gd-playwright`
 
 ### Manual
-Copy `emitter/` into `addons/@aviorstudio_gd-playwright/` and enable the plugin.
+Copy this directory into `addons/@aviorstudio_gd-playwright/` and enable the plugin.
 
 ## Quick Start
 
 ```gdscript
 const PlaywrightServiceModule = preload("res://addons/@aviorstudio_gd-playwright/src/playwright_service.gd")
 
-PlaywrightService.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, true, true, 1000))
+PlaywrightService.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, true, true, "[GD_PLAYWRIGHT_EVENT]", 1000, 500))
 PlaywrightService.emit_event("route_loaded", {"route": "home"})
 ```
 
 ## API Reference
 
 - `PlaywrightServiceModule`: event emission utilities targeting browser `window` state.
-- `PlaywrightConfig`: toggles event emission behavior and buffer limits.
-- `emitter/`: Godot addon implementation.
+- `PlaywrightConfig`: toggles event emission behavior, log prefix, and buffer limits.
 - `listener/`: JavaScript listener/runtime placeholder.
 
 ## Configuration

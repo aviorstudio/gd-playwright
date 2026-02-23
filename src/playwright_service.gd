@@ -4,22 +4,31 @@ extends Node
 
 ## Runtime configuration for browser event emission behavior.
 class PlaywrightConfig extends RefCounted:
+	## Enables event emission in non-test mode.
 	var enabled: bool = false
+	## Forces test-mode behavior and startup signal emission.
 	var test_mode: bool = false
+	## Enables debug console logging for emitted events.
 	var log_events: bool = true
+	## Console log prefix used when `log_events` is enabled.
+	var log_prefix: String = "[GD_PLAYWRIGHT_EVENT]"
+	## Maximum buffered events retained in `window.godotEvents`.
 	var buffer_max: int = 1000
+	## Number of most-recent events retained when trimming buffer.
 	var buffer_trim: int = 500
 
 	func _init(
 		enabled: bool = false,
 		test_mode: bool = false,
 		log_events: bool = true,
+		log_prefix: String = "[GD_PLAYWRIGHT_EVENT]",
 		buffer_max: int = 1000,
 		buffer_trim: int = 500
 	) -> void:
 		self.enabled = enabled
 		self.test_mode = test_mode
 		self.log_events = log_events
+		self.log_prefix = log_prefix
 		self.buffer_max = buffer_max
 		self.buffer_trim = buffer_trim
 
@@ -28,20 +37,26 @@ const SETTINGS_PREFIX := "gd_playwright/"
 const SETTING_ENABLED := SETTINGS_PREFIX + "enabled"
 const SETTING_TEST_MODE := SETTINGS_PREFIX + "test_mode"
 const SETTING_LOG_EVENTS := SETTINGS_PREFIX + "log_events"
+const SETTING_LOG_PREFIX := SETTINGS_PREFIX + "log_prefix"
 const SETTING_EVENT_BUFFER_MAX := SETTINGS_PREFIX + "event_buffer_max"
 const SETTING_EVENT_BUFFER_TRIM := SETTINGS_PREFIX + "event_buffer_trim"
 
 const DEFAULT_LOG_EVENTS := true
+const DEFAULT_LOG_PREFIX := "[GD_PLAYWRIGHT_EVENT]"
 const DEFAULT_EVENT_BUFFER_MAX := 1000
 const DEFAULT_EVENT_BUFFER_TRIM := 500
 
 var _config: PlaywrightConfig = null
 
+## Applies explicit runtime configuration.
+##
+## When `config` is null, falls back to project settings.
 func configure(config: PlaywrightConfig) -> void:
 	_config = config if config else _config_from_project_settings()
 
+## Returns the effective runtime configuration.
 func get_config() -> PlaywrightConfig:
-	return _config
+	return _resolve_config()
 
 func _ready() -> void:
 	if not OS.has_feature("web"):
@@ -53,12 +68,15 @@ func _ready() -> void:
 func _on_test_mode_ready() -> void:
 	emit_event("service_ready")
 
+## Emits a standard named event.
 func emit_event(event_name: String, payload: Dictionary = {}) -> void:
 	emit_event_to_browser(event_name, payload)
 
+## Emits a custom event alias.
 func emit_custom_event(name: String, data: Dictionary = {}) -> void:
 	emit_event(name, data)
 
+## Emits an event payload to browser JavaScript runtime.
 func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 	if not _should_emit_events():
 		return
@@ -73,7 +91,7 @@ func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 
 	var config: PlaywrightConfig = _resolve_config()
 	if config.log_events:
-		JavaScriptBridge.eval("console.log('[GD_PLAYWRIGHT_EVENT]', " + json_string + ")")
+		JavaScriptBridge.eval("console.log(" + JSON.stringify(config.log_prefix) + ", " + json_string + ")")
 
 	var buffer_max: int = maxi(config.buffer_max, 0)
 	var buffer_trim: int = maxi(config.buffer_trim, 0)
@@ -125,6 +143,7 @@ func _config_from_project_settings() -> PlaywrightConfig:
 		bool(ProjectSettings.get_setting(SETTING_ENABLED, false)),
 		bool(ProjectSettings.get_setting(SETTING_TEST_MODE, false)),
 		bool(ProjectSettings.get_setting(SETTING_LOG_EVENTS, DEFAULT_LOG_EVENTS)),
+		str(ProjectSettings.get_setting(SETTING_LOG_PREFIX, DEFAULT_LOG_PREFIX)),
 		int(ProjectSettings.get_setting(SETTING_EVENT_BUFFER_MAX, DEFAULT_EVENT_BUFFER_MAX)),
 		int(ProjectSettings.get_setting(SETTING_EVENT_BUFFER_TRIM, DEFAULT_EVENT_BUFFER_TRIM))
 	)
