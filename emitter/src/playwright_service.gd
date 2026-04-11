@@ -1,6 +1,14 @@
 ## Playwright event bridge for exposing Godot runtime events to browser tests.
+##
+## Provides event emission to window.godotEvents and an element position map
+## for coordinate-free UI testing via set_meta("playwright", "element_key").
 class_name PlaywrightServiceModule
 extends Node
+
+const ElementMapService = preload("element_map_service.gd")
+const PlaywrightTagNode = preload("playwright_tag_node.gd")
+
+const META_KEY := "playwright"
 
 ## Runtime configuration for browser event emission behavior.
 class PlaywrightConfig extends RefCounted:
@@ -36,6 +44,7 @@ const DEFAULT_EVENT_BUFFER_MAX := 1000
 const DEFAULT_EVENT_BUFFER_TRIM := 500
 
 var _config: PlaywrightConfig = null
+var _element_map: ElementMapService = null
 
 func configure(config: PlaywrightConfig) -> void:
 	_config = config if config else _config_from_project_settings()
@@ -51,13 +60,63 @@ func _ready() -> void:
 	_on_test_mode_ready()
 
 func _on_test_mode_ready() -> void:
+	_element_map = ElementMapService.new()
+	_element_map.setup(self)
 	emit_event("service_ready")
+
+## Returns the element map service for tag registration.
+func get_element_map() -> ElementMapService:
+	if _element_map == null:
+		_element_map = ElementMapService.new()
+		_element_map.setup(self)
+	return _element_map
+
+## Called by ElementMapService via deferred call when the map is dirty.
+func _on_element_map_flush_requested() -> void:
+	if _element_map != null:
+		_element_map.flush_to_browser()
+
+func scan_scene(clear_existing: bool = false) -> void:
+	if clear_existing:
+		call_deferred("_clear_and_scan_scene")
+	else:
+		call_deferred("_scan_and_tag_scene")
+
+func _clear_and_scan_scene() -> void:
+	var element_map_service: ElementMapService = get_element_map()
+	if element_map_service != null:
+		element_map_service.clear()
+	_scan_and_tag_scene()
+
+func _scan_and_tag_scene() -> void:
+	var element_map_service: ElementMapService = get_element_map()
+	if element_map_service == null:
+		return
+	var scene_tree: SceneTree = get_tree()
+	if not scene_tree or not scene_tree.current_scene:
+		return
+	_scan_node_recursive(scene_tree.current_scene, element_map_service)
+	call_deferred("_on_element_map_flush_requested")
+
+func _scan_node_recursive(node: Node, element_map_service: ElementMapService) -> void:
+	if node.has_meta(META_KEY):
+		var tag_key: String = str(node.get_meta(META_KEY))
+		if not tag_key.is_empty() and (node is Control or node is Node2D):
+			var already_tagged: bool = false
+			for child in node.get_children():
+				if child is PlaywrightTagNode:
+					already_tagged = true
+					break
+			if not already_tagged:
+				var tag := PlaywrightTagNode.new()
+				tag.tag_key = tag_key
+				tag.set_element_map(element_map_service)
+				node.add_child(tag)
+	for child in node.get_children():
+		_scan_node_recursive(child, element_map_service)
 
 func emit_event(event_name: String, payload: Dictionary = {}) -> void:
 	emit_event_to_browser(event_name, payload)
-
-func emit_custom_event(name: String, data: Dictionary = {}) -> void:
-	emit_event(name, data)
 
 func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 	if not _should_emit_events():
