@@ -65,18 +65,45 @@ func _on_test_mode_ready() -> void:
 	emit_event("service_ready")
 
 ## Returns the element map service for tag registration.
+## Returns null when the service is disabled (not in test/debug mode).
 func get_element_map() -> ElementMapService:
+	if not _should_emit_events():
+		return null
 	if _element_map == null:
 		_element_map = ElementMapService.new()
 		_element_map.setup(self)
 	return _element_map
 
+## Sets arbitrary game state on window.godotBoardState for CLI consumption.
+## Call this from game code whenever board/match state changes.
+## The data is game-specific — gd-playwright just ferries it to the browser.
+## No-op when the service is disabled.
+func set_board_state(state: Dictionary) -> void:
+	if not _should_emit_events():
+		return
+	var json_string: String = JSON.stringify(state)
+	JavaScriptBridge.eval("window.godotBoardState = %s;" % json_string)
+
+## Clears window.godotBoardState.
+## No-op when the service is disabled.
+func clear_board_state() -> void:
+	if not _should_emit_events():
+		return
+	JavaScriptBridge.eval("window.godotBoardState = null;")
+
 ## Called by ElementMapService via deferred call when the map is dirty.
+## No-op when the service is disabled.
 func _on_element_map_flush_requested() -> void:
+	if not _should_emit_events():
+		return
 	if _element_map != null:
 		_element_map.flush_to_browser()
 
+## Scans the current scene tree for nodes with set_meta("playwright", "key")
+## and registers them in the element map. No-op when the service is disabled.
 func scan_scene(clear_existing: bool = false) -> void:
+	if not _should_emit_events():
+		return
 	if clear_existing:
 		call_deferred("_clear_and_scan_scene")
 	else:

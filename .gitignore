@@ -1,0 +1,6 @@
+
+# Build artifacts
+cli/gdpw
+
+# Playwright CLI session files
+cli/.playwright-cli/
