@@ -14,8 +14,9 @@ class FakePlaywrightService extends PlaywrightServiceModule:
 
 func _initialize() -> void:
 	var failures: Array[String] = []
-	_test_emit_event_and_alias_delegate_to_browser_emitter(failures)
+	_test_emit_event_delegates_to_browser_emitter(failures)
 	_test_configure_retains_buffer_and_flag_settings(failures)
+	_test_meta_key_constant(failures)
 
 	if failures.is_empty():
 		print("PASS gd-playwright playwright_service_test")
@@ -26,17 +27,17 @@ func _initialize() -> void:
 		push_error(failure)
 	quit(1)
 
-func _test_emit_event_and_alias_delegate_to_browser_emitter(failures: Array[String]) -> void:
+func _test_emit_event_delegates_to_browser_emitter(failures: Array[String]) -> void:
 	var service := FakePlaywrightService.new()
 	service.emit_event("one", {"id": 1})
-	service.emit_custom_event("two", {"id": 2})
+	service.emit_event("two", {"id": 2})
 
 	if service.call_count != 2:
-		failures.append("Expected emit_event and emit_custom_event to delegate to browser emitter")
+		failures.append("Expected emit_event to delegate to browser emitter twice")
 	if service.captured_event_name != "two":
-		failures.append("Expected latest delegated event name to match alias call")
+		failures.append("Expected latest delegated event name to match second call")
 	if int(service.captured_payload.get("id", 0)) != 2:
-		failures.append("Expected latest delegated payload to match alias call")
+		failures.append("Expected latest delegated payload to match second call")
 	service.free()
 
 func _test_configure_retains_buffer_and_flag_settings(failures: Array[String]) -> void:
@@ -54,3 +55,7 @@ func _test_configure_retains_buffer_and_flag_settings(failures: Array[String]) -
 	if effective.buffer_trim != 17:
 		failures.append("Expected configure to retain buffer_trim setting")
 	service.free()
+
+func _test_meta_key_constant(failures: Array[String]) -> void:
+	if PlaywrightServiceModule.META_KEY != "playwright":
+		failures.append("Expected META_KEY to be 'playwright', got '%s'" % PlaywrightServiceModule.META_KEY)
