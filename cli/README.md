@@ -16,7 +16,15 @@ Or build from source:
 
 ```bash
 cd cli
-go build -o gdpw ./cmd/gdpw/
+mkdir -p bin
+go build -o bin/gdpw ./cmd/gdpw/
+```
+
+Or use the helper script:
+
+```bash
+cd cli
+./build.sh
 ```
 
 ## Quick Start
