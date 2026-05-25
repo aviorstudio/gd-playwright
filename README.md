@@ -1,48 +1,26 @@
 # gd-playwright
 
-Monorepo for Playwright integration with a Godot event emitter addon.
+Playwright tooling for Godot web exports.
 
-## Installation
+This is a monorepo with separate packages for the Godot addon, CLI, and JavaScript runtime helpers.
 
-### Via gdpm
-`gdpm install @aviorstudio/gd-playwright`
+## Packages
 
-### Manual
-Copy `gd/addon/` into `addons/@aviorstudio_gd-playwright/` and enable the plugin.
+- [`gd/`](gd/): Godot addon that exposes browser events, element positions, and test state.
+- [`cli/`](cli/): `gdpw` command-line helper for querying exported games through Chrome DevTools Protocol.
+- [`js/`](js/): JavaScript-side Playwright helper package.
 
 ## Quick Start
 
-```gdscript
-const PlaywrightServiceModule = preload("res://addons/@aviorstudio_gd-playwright/src/playwright_service.gd")
+1. Install the Godot addon from [`gd/`](gd/).
+2. Tag Godot nodes with `set_meta("playwright", "key")`.
+3. Use [`cli/`](cli/) to list elements, read state, and wait for events from a running web export.
 
-PlaywrightService.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, true, true, 1000))
-PlaywrightService.emit_event("route_loaded", {"route": "home"})
-PlaywrightService.set_test_state("menu", {"route": "home"})
-```
+## Release Tags
 
-## API Reference
-
-- `PlaywrightServiceModule`: event emission utilities targeting browser `window` state.
-- `PlaywrightConfig`: toggles event emission behavior and buffer limits.
-- `set_test_state(namespace, state)`: exposes game-defined state at `window.godotTestState[namespace]`.
-- `scan_scene()`: discovers nodes tagged with `set_meta("playwright", "key")` for coordinate-free browser tests.
-- `gd/`: Godot addon package root, matching the standalone addon repo layout.
-- `gd/addon/`: Godot addon implementation.
-- `gd/tests/`: Godot addon tests.
-- `cli/`: companion CLI for querying exported Godot web games.
-- `js/`: JavaScript listener/runtime placeholder.
-
-## Configuration
-
-No required project settings. Optional defaults are resolved from plugin runtime config.
-
-## Security
-
-The emitter is intended for web test/debug builds. Do not enable test mode in production exports, and do not expose private session or player data through test state.
-
-## Testing
-
-`./gd/tests/test.sh`
+- Godot addon: `gd-v0.0.1`
+- CLI: `cli-v0.0.1`
+- JavaScript package: `js-v0.0.1`
 
 ## License
 

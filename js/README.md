@@ -1,12 +1,15 @@
-# js
+# gd-playwright JS
 
-This directory is reserved for the JavaScript-side Playwright listener/runtime.
+JavaScript-side helpers for Godot web export testing with Playwright.
+
+This package is reserved for browser/runtime utilities that complement the Godot addon and `gdpw` CLI.
 
 ## Status
 
-TODO: add the JS listener project here.
+The JavaScript package has not been implemented yet.
 
-## Notes
+Use the Godot addon in `../gd/` and the CLI in `../cli/` for the current workflow.
 
-- Keep this code isolated from the Godot addon in `gd/addon/`.
-- Add Node/TypeScript config here when implementation begins.
+## License
+
+MIT
