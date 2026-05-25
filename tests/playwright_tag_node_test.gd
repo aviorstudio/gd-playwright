@@ -1,6 +1,6 @@
 extends SceneTree
 
-const PlaywrightTagNode = preload("res://emitter/src/playwright_tag_node.gd")
+const PlaywrightTagNode = preload("res://addon/src/playwright_tag_node.gd")
 
 func _initialize() -> void:
 	var failures: Array[String] = []
