@@ -1,6 +1,1 @@
-
-# Build artifacts
-cli/bin
-
-# Playwright CLI session files
-cli/.playwright-cli/
+.DS_Store
