@@ -1,49 +1,16 @@
 name: Release CLI
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release, e.g. 0.0.1'
-        required: true
-        type: string
+  release:
+    types: [published]
 
 permissions:
   contents: write
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      tag_name: ${{ steps.create-tag.outputs.tag_name }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Create release tag
-        id: create-tag
-        run: |
-          set -euo pipefail
-          version="${{ inputs.version }}"
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "Version must look like 0.0.1 or 0.0.1-rc.1." >&2
-            exit 1
-          fi
-          tag_name="cli-v${version}"
-          if git ls-remote --exit-code --tags origin "refs/tags/${tag_name}" >/dev/null 2>&1; then
-            echo "Tag ${tag_name} already exists." >&2
-            exit 1
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "$tag_name" "$GITHUB_SHA"
-          git push origin "$tag_name"
-          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
-
   release:
+    if: startsWith(github.event.release.tag_name, 'cli-v')
     runs-on: ubuntu-latest
-    needs: prepare
     strategy:
       matrix:
         include:
@@ -78,20 +45,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../dist
-          output="../dist/gdpw-${{ needs.prepare.outputs.tag_name }}-${{ matrix.suffix }}"
+          output="../dist/gdpw-${{ github.event.release.tag_name }}-${{ matrix.suffix }}"
           go build -o "$output" ./cmd/gdpw/
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
         with:
           name: gdpw-${{ matrix.suffix }}
-          path: dist/gdpw-${{ needs.prepare.outputs.tag_name }}-${{ matrix.suffix }}
+          path: dist/gdpw-${{ github.event.release.tag_name }}-${{ matrix.suffix }}
 
   publish:
+    if: startsWith(github.event.release.tag_name, 'cli-v')
     runs-on: ubuntu-latest
-    needs:
-      - prepare
-      - release
+    needs: release
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -101,6 +67,5 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.prepare.outputs.tag_name }}
-          generate_release_notes: true
+          tag_name: ${{ github.event.release.tag_name }}
           files: dist/*
