@@ -6,7 +6,7 @@ Provides three browser-side primitives for test automation and AI agent interact
 
 - **Events** — `window.godotEvents` array + `godot-event` CustomEvent
 - **Elements** — `window.godotElements` map of tagged UI element positions
-- **Board State** — `window.godotBoardState` for arbitrary game state
+- **Test State** — `window.godotTestState` namespaces for arbitrary game state
 
 All features are gated behind `_should_emit_events()` — nothing is exposed in production builds unless explicitly enabled.
 
@@ -30,7 +30,7 @@ Alternatively, add `autoload.gd` as an autoload named `PlaywrightService`.
 
 - `plugin.cfg` / `plugin.gd`: editor plugin that installs the `PlaywrightService` autoload.
 - `autoload.gd`: autoload entrypoint (extends `src/playwright_service.gd`).
-- `src/playwright_service.gd`: event emitter, element map, and board state bridge.
+- `src/playwright_service.gd`: event emitter, element map, and test state bridge.
 - `src/element_map_service.gd`: tracks tagged element positions for coordinate-free clicking.
 - `src/playwright_tag_node.gd`: auto-attaches to nodes with `set_meta("playwright", "key")` and polls their position.
 
@@ -76,17 +76,17 @@ if element_map:
 
 `get_element_map()` returns `null` when the service is disabled, so callers don't need their own gate checks.
 
-## Board State
+## Test State
 
-Push arbitrary game state for CLI consumption:
+Push arbitrary game state for CLI consumption under a namespace:
 
 ```gdscript
-PlaywrightService.set_board_state({"turn": 4, "units": {...}})
+PlaywrightService.set_test_state("puzzle", {"moves": 4, "solved": false})
 ```
 
-This sets `window.godotBoardState` in the browser. The data shape is entirely game-specific — the emitter just ferries the dictionary to the browser as JSON.
+This sets `window.godotTestState.puzzle` in the browser. The data shape is entirely game-specific; the emitter just ferries the dictionary to the browser as JSON.
 
-Clear it with `PlaywrightService.clear_board_state()`.
+Clear it with `PlaywrightService.clear_test_state("puzzle")`.
 
 ## Configuration
 
@@ -110,7 +110,7 @@ All features are gated behind `_should_emit_events()`, which returns `true` only
 In production web builds with `test_mode=false` and `enabled=false`:
 - No events are emitted
 - `get_element_map()` returns `null`
-- `set_board_state()` is a no-op
+- `set_test_state()` is a no-op
 - `scan_scene()` is a no-op
 - No tag nodes are created
 - No JS globals are set
