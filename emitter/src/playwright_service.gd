@@ -74,22 +74,30 @@ func get_element_map() -> ElementMapService:
 		_element_map.setup(self)
 	return _element_map
 
-## Sets arbitrary game state on window.godotBoardState for CLI consumption.
-## Call this from game code whenever board/match state changes.
-## The data is game-specific — gd-playwright just ferries it to the browser.
+## Sets arbitrary test state on window.godotTestState[namespace] for CLI consumption.
+## Call this from game code whenever test-observable state changes.
+## The data is game-specific; gd-playwright only ferries it to the browser.
 ## No-op when the service is disabled.
-func set_board_state(state: Dictionary) -> void:
+func set_test_state(state_namespace_name: String, state: Dictionary) -> void:
 	if not _should_emit_events():
+		return
+	var state_namespace: String = state_namespace_name.strip_edges()
+	if state_namespace.is_empty():
 		return
 	var json_string: String = JSON.stringify(state)
-	JavaScriptBridge.eval("window.godotBoardState = %s;" % json_string)
+	var namespace_json: String = JSON.stringify(state_namespace)
+	JavaScriptBridge.eval("window.godotTestState = window.godotTestState || {}; window.godotTestState[%s] = %s;" % [namespace_json, json_string])
 
-## Clears window.godotBoardState.
+## Clears one window.godotTestState namespace.
 ## No-op when the service is disabled.
-func clear_board_state() -> void:
+func clear_test_state(state_namespace_name: String) -> void:
 	if not _should_emit_events():
 		return
-	JavaScriptBridge.eval("window.godotBoardState = null;")
+	var state_namespace: String = state_namespace_name.strip_edges()
+	if state_namespace.is_empty():
+		return
+	var namespace_json: String = JSON.stringify(state_namespace)
+	JavaScriptBridge.eval("if (window.godotTestState) { delete window.godotTestState[%s]; }" % namespace_json)
 
 ## Called by ElementMapService via deferred call when the map is dirty.
 ## No-op when the service is disabled.
