@@ -8,5 +8,5 @@ TODO: add the JS listener project here.
 
 ## Notes
 
-- Keep this code isolated from the Godot addon in `emitter/`.
+- Keep this code isolated from the Godot addon in `addon/`.
 - Add Node/TypeScript config here when implementation begins.

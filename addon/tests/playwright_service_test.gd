@@ -1,6 +1,6 @@
 extends SceneTree
 
-const PlaywrightServiceModule = preload("res://src/playwright_service.gd")
+const PlaywrightServiceModule = preload("res://addon/src/playwright_service.gd")
 
 class FakePlaywrightService extends PlaywrightServiceModule:
 	var captured_event_name: String = ""

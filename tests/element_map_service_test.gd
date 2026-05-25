@@ -1,6 +1,6 @@
 extends SceneTree
 
-const ElementMapService = preload("res://emitter/src/element_map_service.gd")
+const ElementMapService = preload("res://addon/src/element_map_service.gd")
 
 func _initialize() -> void:
 	var failures: Array[String] = []
