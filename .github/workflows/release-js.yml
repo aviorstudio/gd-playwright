@@ -1,9 +1,12 @@
 name: Release JS
 
 on:
-  push:
-    tags:
-      - 'js-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.0.1'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -13,9 +16,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate JS package
         run: test -f js/package.json
+
+      - name: Create release tag
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Version must look like 0.0.1 or 0.0.1-rc.1." >&2
+            exit 1
+          fi
+          tag_name="js-v${version}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag_name}" >/dev/null 2>&1; then
+            echo "Tag ${tag_name} already exists." >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$tag_name" "$GITHUB_SHA"
+          git push origin "$tag_name"
+          echo "TAG_NAME=$tag_name" >> "$GITHUB_ENV"
 
       - uses: oven-sh/setup-bun@v2
 
@@ -30,5 +54,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG_NAME }}
           generate_release_notes: true
           files: dist/*
