@@ -8,7 +8,7 @@ Monorepo for Playwright integration with a Godot event emitter addon.
 `gdpm install @aviorstudio/gd-playwright`
 
 ### Manual
-Copy `addon/` into `addons/@aviorstudio_gd-playwright/` and enable the plugin.
+Copy `gd/addon/` into `addons/@aviorstudio_gd-playwright/` and enable the plugin.
 
 ## Quick Start
 
@@ -26,8 +26,11 @@ PlaywrightService.set_test_state("menu", {"route": "home"})
 - `PlaywrightConfig`: toggles event emission behavior and buffer limits.
 - `set_test_state(namespace, state)`: exposes game-defined state at `window.godotTestState[namespace]`.
 - `scan_scene()`: discovers nodes tagged with `set_meta("playwright", "key")` for coordinate-free browser tests.
-- `addon/`: Godot addon implementation.
-- `listener/`: JavaScript listener/runtime placeholder.
+- `gd/`: Godot addon package root, matching the standalone addon repo layout.
+- `gd/addon/`: Godot addon implementation.
+- `gd/tests/`: Godot addon tests.
+- `cli/`: companion CLI for querying exported Godot web games.
+- `js/`: JavaScript listener/runtime placeholder.
 
 ## Configuration
 
@@ -39,7 +42,7 @@ The emitter is intended for web test/debug builds. Do not enable test mode in pr
 
 ## Testing
 
-`./tests/test.sh`
+`./gd/tests/test.sh`
 
 ## License
 

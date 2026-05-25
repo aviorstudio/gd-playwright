@@ -1,4 +1,4 @@
-# listener
+# js
 
 This directory is reserved for the JavaScript-side Playwright listener/runtime.
 
@@ -8,5 +8,5 @@ TODO: add the JS listener project here.
 
 ## Notes
 
-- Keep this code isolated from the Godot addon in `addon/`.
+- Keep this code isolated from the Godot addon in `gd/addon/`.
 - Add Node/TypeScript config here when implementation begins.

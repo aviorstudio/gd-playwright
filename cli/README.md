@@ -1,6 +1,6 @@
 # gdpw — Godot Playwright CLI
 
-Read-only companion CLI for [playwright-cli](https://github.com/microsoft/playwright-cli). Connects to a browser running a Godot web game and queries element positions and events emitted by the [gd-playwright](../addon/) emitter addon.
+Read-only companion CLI for [playwright-cli](https://github.com/microsoft/playwright-cli). Connects to a browser running a Godot web game and queries element positions and events emitted by the [gd-playwright](../gd/addon/) emitter addon.
 
 `gdpw` provides coordinates and game state. `playwright-cli` performs clicks and inputs. The two tools connect to the same browser independently via CDP.
 
