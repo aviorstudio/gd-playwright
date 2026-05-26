@@ -6,9 +6,9 @@ Use this addon when browser-based tests need stable names like `start_button` in
 
 ## Installation
 
-### Via gdpm
+### Via gdam
 
-`gdpm install @aviorstudio/gd-playwright`
+`gdam install @aviorstudio/gd-playwright`
 
 ### Manual
 
