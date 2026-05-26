@@ -126,7 +126,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release.outputs.tag }}
-        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "$TAG" --notes "Release $TAG"
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(dist/*.zip dist/gdpw-*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo 'No release assets were created.' >&2
+            exit 1
+          fi
+          gh release create "$TAG" "${files[@]}" --target "$GITHUB_SHA" --title "$TAG" --notes "Release $TAG"
 
       - name: Install GDAM
         if: inputs.target == 'gd'
