@@ -83,29 +83,56 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
 
-      - name: Build CLI artifacts
+      - name: Test CLI
+        if: inputs.target == 'cli'
+        working-directory: cli
+        run: go test ./...
+
+      - name: Build CLI release artifacts
         if: inputs.target == 'cli'
         env:
           VERSION: ${{ steps.release.outputs.version }}
-          TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
           mkdir -p dist
+
           build() {
             goos="$1"
             goarch="$2"
-            suffix="$3"
-            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build \
+            os_label="$3"
+            arch_label="$4"
+            archive_ext="$5"
+            exe=""
+            if [ "$goos" = "windows" ]; then
+              exe=".exe"
+            fi
+
+            name="gdpw_${os_label}_${arch_label}"
+            out_dir="dist/$name"
+            mkdir -p "$out_dir"
+            out_path="$PWD/$out_dir/gdpw$exe"
+            (cd cli && GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build \
               -ldflags "-s -w -X main.version=$VERSION" \
-              -o "../dist/gdpw-${TAG}-${suffix}" ./cmd/gdpw/
+              -o "$out_path" ./cmd/gdpw/)
+            cp README.md "$out_dir/README.md"
+
+            if [ "$archive_ext" = "zip" ]; then
+              (cd "$out_dir" && zip -q "../$name.zip" "gdpw$exe" README.md)
+            else
+              tar -C "$out_dir" -czf "dist/$name.tar.gz" "gdpw$exe" README.md
+            fi
           }
-          cd cli
-          build linux amd64 linux-amd64
-          build linux arm64 linux-arm64
-          build darwin amd64 darwin-amd64
-          build darwin arm64 darwin-arm64
-          build windows amd64 windows-amd64.exe
+
+          build linux amd64 Linux x86_64 tar.gz
+          build linux arm64 Linux arm64 tar.gz
+          build darwin amd64 Darwin x86_64 tar.gz
+          build darwin arm64 Darwin arm64 tar.gz
+          build windows amd64 Windows x86_64 zip
+          build windows arm64 Windows arm64 zip
+
+          (cd dist && sha256sum *.tar.gz *.zip > checksums.txt)
 
       - name: Package GD addon
         if: inputs.target == 'gd'
@@ -129,7 +156,10 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          files=(dist/*.zip dist/gdpw-*)
+          files=(dist/*.tar.gz dist/*.zip)
+          if [ -f dist/checksums.txt ]; then
+            files+=(dist/checksums.txt)
+          fi
           if [ ${#files[@]} -eq 0 ]; then
             echo 'No release assets were created.' >&2
             exit 1
