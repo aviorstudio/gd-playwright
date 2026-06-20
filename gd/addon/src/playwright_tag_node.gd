@@ -1,7 +1,9 @@
+@tool
 ## Tracks a parent Control or Node2D position in the element map.
 ##
 ## Created automatically by PlaywrightServiceModule.scan_scene() for nodes
-## that have set_meta("playwright", "some_key"). Can also be added manually.
+## that have set_meta("playwright", "some_key"). Prefer adding this node
+## directly in scenes so test handles are visible in the editor.
 class_name PlaywrightTagNode
 extends Node
 
@@ -9,8 +11,12 @@ const ElementMapService = preload("element_map_service.gd")
 
 const POLL_INTERVAL: float = 0.1
 
-@export var tag_key: String = ""
+@export var tag_key: String = "":
+	set(value):
+		tag_key = value.strip_edges()
+		update_configuration_warnings()
 @export var include_size: bool = true
+@export var service_path: NodePath = NodePath("/root/PlaywrightService")
 
 var _resolved_key: String = ""
 var _element_map: ElementMapService = null
@@ -23,11 +29,19 @@ var _poll_timer: float = 0.0
 func set_element_map(element_map: ElementMapService) -> void:
 	_element_map = element_map
 
+func get_resolved_key_preview() -> String:
+	if not tag_key.is_empty():
+		return tag_key
+	return _derive_key_from_meta()
+
 func _ready() -> void:
 	set_process(false)
-	if _element_map == null:
+	if Engine.is_editor_hint():
+		update_configuration_warnings()
 		return
-	_resolved_key = tag_key if not tag_key.is_empty() else _derive_key_from_meta()
+	if _element_map == null:
+		_element_map = _get_autoload_element_map()
+	_resolved_key = get_resolved_key_preview()
 	if _resolved_key.is_empty():
 		return
 	_push_position()
@@ -77,13 +91,59 @@ func _push_position() -> void:
 	_last_visible = visible
 	_element_map.update_position(_resolved_key, center, size, visible)
 
+func _get_configuration_warnings() -> PackedStringArray:
+	var warnings := PackedStringArray()
+	var parent_node: Node = get_parent()
+	if parent_node == null:
+		warnings.append("PlaywrightTag must be a child of the Control or Node2D it exposes to tests.")
+		return warnings
+	if not (parent_node is Control or parent_node is Node2D):
+		warnings.append("PlaywrightTag only supports Control and Node2D parents.")
+	var resolved_key: String = get_resolved_key_preview()
+	if resolved_key.is_empty():
+		warnings.append("Set tag_key, or set parent metadata playwright='your_key'.")
+	elif _has_duplicate_key(parent_node, resolved_key):
+		warnings.append("Another PlaywrightTag or playwright metadata entry uses '%s'. Keys should be unique." % resolved_key)
+	return warnings
+
 func _derive_key_from_meta() -> String:
 	var parent_node: Node = get_parent()
 	if parent_node == null:
 		return ""
 	if parent_node.has_meta("playwright"):
-		return str(parent_node.get_meta("playwright"))
+		return str(parent_node.get_meta("playwright")).strip_edges()
 	return ""
+
+func _get_autoload_element_map() -> ElementMapService:
+	if not is_inside_tree():
+		return null
+	var service: Node = get_node_or_null(service_path)
+	if service == null and get_tree() != null and get_tree().root != null:
+		service = get_tree().root.get_node_or_null("PlaywrightService")
+	if service == null or not service.has_method("get_element_map"):
+		return null
+	return service.call("get_element_map") as ElementMapService
+
+func _has_duplicate_key(parent_node: Node, key: String) -> bool:
+	var scene_root: Node = parent_node.get_tree().edited_scene_root if Engine.is_editor_hint() and parent_node.is_inside_tree() else null
+	if scene_root == null:
+		scene_root = parent_node.get_tree().current_scene if parent_node.is_inside_tree() else parent_node.owner
+	if scene_root == null:
+		scene_root = parent_node
+	return _count_matching_keys(scene_root, key) > 1
+
+func _count_matching_keys(node: Node, key: String) -> int:
+	var count: int = 0
+	if node != self:
+		if node is PlaywrightTagNode:
+			var tag: PlaywrightTagNode = node as PlaywrightTagNode
+			if tag.get_resolved_key_preview() == key:
+				count += 1
+		elif node.has_meta("playwright") and str(node.get_meta("playwright")).strip_edges() == key:
+			count += 1
+	for child: Node in node.get_children():
+		count += _count_matching_keys(child, key)
+	return count
 
 static func _normalize_name(name: String) -> String:
 	var result: String = ""

@@ -1,6 +1,11 @@
 extends SceneTree
 
 const ElementMapService = preload("res://addon/src/element_map_service.gd")
+const PlaywrightServiceModule = preload("res://addon/src/playwright_service.gd")
+
+class EnabledPlaywrightService extends PlaywrightServiceModule:
+	func _should_emit_events() -> bool:
+		return true
 
 func _initialize() -> void:
 	var failures: Array[String] = []
@@ -10,6 +15,7 @@ func _initialize() -> void:
 	_test_clear_removes_all(failures)
 	_test_empty_key_rejected(failures)
 	_test_get_all_keys(failures)
+	_test_service_register_element_api(failures)
 
 	if failures.is_empty():
 		print("PASS gd-playwright element_map_service_test")
@@ -131,3 +137,22 @@ func _test_get_all_keys(failures: Array[String]) -> void:
 		failures.append("Expected to_dict h=4")
 	if not bool(dict.get("visible", false)):
 		failures.append("Expected to_dict visible=true")
+
+func _test_service_register_element_api(failures: Array[String]) -> void:
+	var service := EnabledPlaywrightService.new()
+	service.register_element("direct_button", Vector2(12, 34), Vector2(56, 78), true)
+	var element_map = service.get_element_map()
+	if element_map == null or not element_map.has_element("direct_button"):
+		failures.append("Expected register_element to write to the element map")
+	else:
+		var entry: ElementMapService.ElementEntry = element_map.get_entry("direct_button")
+		if entry.width != 56 or entry.height != 78:
+			failures.append("Expected register_element to retain size")
+	service.unregister_element("direct_button")
+	if element_map != null and element_map.has_element("direct_button"):
+		failures.append("Expected unregister_element to remove key")
+	service.register_element("another_button", Vector2.ZERO, Vector2.ONE, true)
+	service.clear_elements()
+	if element_map != null and element_map.get_element_count() != 0:
+		failures.append("Expected clear_elements to remove all keys")
+	service.free()

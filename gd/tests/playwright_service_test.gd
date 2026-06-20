@@ -15,6 +15,7 @@ class FakePlaywrightService extends PlaywrightServiceModule:
 func _initialize() -> void:
 	var failures: Array[String] = []
 	_test_emit_event_delegates_to_browser_emitter(failures)
+	_test_emit_namespaced_event_delegates_to_browser_emitter(failures)
 	_test_configure_retains_buffer_and_flag_settings(failures)
 	_test_meta_key_constant(failures)
 
@@ -38,6 +39,18 @@ func _test_emit_event_delegates_to_browser_emitter(failures: Array[String]) -> v
 		failures.append("Expected latest delegated event name to match second call")
 	if int(service.captured_payload.get("id", 0)) != 2:
 		failures.append("Expected latest delegated payload to match second call")
+	service.free()
+
+func _test_emit_namespaced_event_delegates_to_browser_emitter(failures: Array[String]) -> void:
+	var service := FakePlaywrightService.new()
+	service.emit_namespaced_event("combat", "turn_started", {"turn": 1})
+
+	if service.call_count != 1:
+		failures.append("Expected emit_namespaced_event to emit once")
+	if service.captured_event_name != "combat.turn_started":
+		failures.append("Expected namespaced event combat.turn_started, got '%s'" % service.captured_event_name)
+	if int(service.captured_payload.get("turn", 0)) != 1:
+		failures.append("Expected namespaced event payload to be retained")
 	service.free()
 
 func _test_configure_retains_buffer_and_flag_settings(failures: Array[String]) -> void:

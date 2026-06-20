@@ -74,6 +74,46 @@ func get_element_map() -> ElementMapService:
 		_element_map.setup(self)
 	return _element_map
 
+## Registers an element position directly without requiring a PlaywrightTag node.
+## Use this for runtime-created or non-Node2D/Control test targets.
+func register_element(key: String, center: Vector2, element_size: Vector2, visible: bool = true) -> void:
+	var element_map_service: ElementMapService = get_element_map()
+	if element_map_service == null:
+		return
+	element_map_service.register(key.strip_edges(), center, element_size, visible)
+
+## Removes a directly registered or tagged element key from the element map.
+func unregister_element(key: String) -> void:
+	var element_map_service: ElementMapService = get_element_map()
+	if element_map_service == null:
+		return
+	element_map_service.unregister(key.strip_edges())
+
+## Clears all registered element positions.
+func clear_elements() -> void:
+	var element_map_service: ElementMapService = get_element_map()
+	if element_map_service == null:
+		return
+	element_map_service.clear()
+
+## Alias for set_test_state() with shorter naming for game-facing services.
+func set_state(state_namespace_name: String, state: Dictionary) -> void:
+	set_test_state(state_namespace_name, state)
+
+## Alias for clear_test_state() with shorter naming for game-facing services.
+func clear_state(state_namespace_name: String) -> void:
+	clear_test_state(state_namespace_name)
+
+## Emits an event with an optional namespace prefix, e.g. "combat.turn_started".
+func emit_namespaced_event(event_namespace: String, event_name: String, payload: Dictionary = {}) -> void:
+	var namespace_name: String = event_namespace.strip_edges()
+	var resolved_event_name: String = event_name.strip_edges()
+	if resolved_event_name.is_empty():
+		return
+	if not namespace_name.is_empty():
+		resolved_event_name = "%s.%s" % [namespace_name, resolved_event_name]
+	emit_event(resolved_event_name, payload)
+
 ## Sets arbitrary test state on window.godotTestState[namespace] for CLI consumption.
 ## Call this from game code whenever test-observable state changes.
 ## The data is game-specific; gd-playwright only ferries it to the browser.

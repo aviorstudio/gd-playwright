@@ -1,0 +1,72 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://addons/@aviorstudio_gd-playwright/examples/app_shell/playwright_example_screen.gd" id="1"]
+[ext_resource type="Script" path="res://addons/@aviorstudio_gd-playwright/src/playwright_tag_node.gd" id="2_tag"]
+[ext_resource type="Script" path="res://addons/@aviorstudio_gd-playwright/src/playwright_event_emitter.gd" id="3_event"]
+[ext_resource type="Script" path="res://addons/@aviorstudio_gd-playwright/src/playwright_state_publisher.gd" id="4_state"]
+
+[node name="PlaywrightExampleScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="PlaywrightTag" type="Node" parent="."]
+script = ExtResource("2_tag")
+tag_key = "example_screen"
+
+[node name="StartEvent" type="Node" parent="."]
+script = ExtResource("3_event")
+event_name = "example_started"
+payload = {
+"route": "example"
+}
+
+[node name="ExampleState" type="Node" parent="."]
+script = ExtResource("4_state")
+state_namespace = "example"
+state = {
+"route": "example"
+}
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -88.0
+offset_right = 160.0
+offset_bottom = 88.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Content" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Panel/Margin/Content"]
+layout_mode = 2
+text = "gd-playwright example"
+horizontal_alignment = 1
+
+[node name="StartButton" type="Button" parent="Panel/Margin/Content"]
+custom_minimum_size = Vector2(220, 48)
+layout_mode = 2
+text = "Start"
+
+[node name="PlaywrightTag" type="Node" parent="Panel/Margin/Content/StartButton"]
+script = ExtResource("2_tag")
+tag_key = "start_button"

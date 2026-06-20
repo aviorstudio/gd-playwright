@@ -37,19 +37,87 @@ func _ready() -> void:
 	PlaywrightService.set_test_state("menu", {"route": "home"})
 ```
 
-Tag any `Control` or `Node2D` with a Playwright key:
+Add a visible `PlaywrightTag` child under any `Control` or `Node2D` that tests need to click or inspect:
+
+```text
+StartButton
+  PlaywrightTag
+    tag_key = "start_button"
+```
+
+When the web export runs with gd-playwright enabled, the tag writes center-point positions to `window.godotElements`:
+
+```json
+{
+  "start_button": { "x": 360, "y": 800, "w": 280, "h": 72, "visible": true }
+}
+```
+
+If your game wraps the addon service with its own autoload, set `service_path` on the helper nodes:
+
+```text
+PlaywrightTag
+  tag_key = "start_button"
+  service_path = "/root/MyPlaywrightService"
+```
+
+Legacy metadata tags still work:
 
 ```gdscript
 button.set_meta("playwright", "start_button")
 PlaywrightService.scan_scene()
 ```
 
-The addon writes center-point positions to `window.godotElements`:
+The editor also includes tool menu actions:
 
-```json
-{
-  "start_button": { "x": 360, "y": 800, "w": 280, "h": 72, "visible": true }
-}
+- `GD Playwright: Scan Scene For Metadata`
+- `GD Playwright: Convert Metadata To Tags`
+
+Use `PlaywrightEventEmitter` when a scene should author a named event in the Inspector:
+
+```text
+HomeScreen
+  RouteLoadedEvent
+    script = PlaywrightEventEmitter
+    event_name = "route_loaded"
+    payload = { "route": "home" }
+```
+
+Game code can call the node when the event occurs:
+
+```gdscript
+$RouteLoadedEvent.emit_playwright_event({"screen": "HomeScreen"})
+```
+
+Use `PlaywrightStatePublisher` for namespaced test-observable state:
+
+```text
+GameScreen
+  GameStatePublisher
+    script = PlaywrightStatePublisher
+    state_namespace = "game"
+```
+
+```gdscript
+$GameStatePublisher.publish({
+	"level": "level_01",
+	"solved": false
+})
+```
+
+An installable example scene is included at:
+
+```text
+res://addons/@aviorstudio_gd-playwright/examples/app_shell/playwright_example_screen.tscn
+```
+
+For runtime-created objects, use the generic service APIs:
+
+```gdscript
+PlaywrightService.register_element("unit_0", center_pos, size, true)
+PlaywrightService.unregister_element("unit_0")
+PlaywrightService.emit_namespaced_event("combat", "turn_started", {"turn": 1})
+PlaywrightService.set_state("combat", {"turn": 1})
 ```
 
 For dynamic objects, register positions manually:
@@ -193,8 +261,8 @@ The `js/` package is reserved and has no release target yet. The release workflo
 Run locally with:
 
 ```sh
-./gd/tests/test.sh
-cd cli && go test ./...
+mise exec -- ./gd/tests/test.sh
+cd cli && mise exec -- go test ./...
 ```
 
 CI runs both implemented test suites.
