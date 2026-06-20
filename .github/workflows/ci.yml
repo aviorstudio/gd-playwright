@@ -16,7 +16,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate addon package
-        run: test -f gd/addon/plugin.cfg
+        run: |
+          set -euo pipefail
+          test -f gd/addon/plugin.cfg
+          test -f gd/addon/plugin.gd
+          test -f gd/addon/autoload.gd
+          test -f gd/addon/src/playwright_service.gd
+          test -f gd/addon/src/playwright_tag_node.gd
+          test -f gd/addon/src/playwright_state_publisher.gd
+          test -f gd/addon/src/playwright_event_emitter.gd
+          test -f gd/addon/src/element_map_service.gd
+          test -f gd/addon/examples/app_shell/playwright_example_screen.tscn
+          test -f gd/addon/examples/app_shell/playwright_example_screen.gd
 
       - name: Install Godot
         if: ${{ hashFiles('gd/tests/test.sh') != '' }}

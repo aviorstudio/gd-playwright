@@ -45,9 +45,11 @@ func _test_tag_key_used_when_set(failures: Array[String]) -> void:
 	tag.tag_key = "custom_key"
 	if tag.tag_key != "custom_key":
 		failures.append("Expected tag_key 'custom_key', got '%s'" % tag.tag_key)
+	tag.free()
 
 func _test_no_element_map_disables_processing(failures: Array[String]) -> void:
 	var tag := PlaywrightTagNode.new()
 	tag.tag_key = "test"
 	if tag._element_map != null:
 		failures.append("Expected null element map before injection")
+	tag.free()
