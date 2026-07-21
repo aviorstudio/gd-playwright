@@ -2,7 +2,7 @@
 
 Playwright tooling for Godot web exports.
 
-This repo contains the Godot addon that emits test metadata from a web export, the read-only `gdpw` CLI that queries that metadata through Chrome DevTools Protocol, and a reserved JavaScript package area for future browser/runtime helpers.
+This repo contains the Godot addon that emits test metadata from a web export, the read-only `gdpw` CLI that queries that metadata and generates Playwright actions, and JavaScript helpers for controlling active games from a persistent Playwright process.
 
 Use it when browser-based tests need stable names like `start_button` instead of hardcoded screen coordinates.
 
@@ -10,7 +10,7 @@ Use it when browser-based tests need stable names like `start_button` instead of
 
 - `gd/`: Godot addon that exposes browser events, element positions, viewport state, and test state.
 - `cli/`: Go `gdpw` command-line helper for querying exported games through CDP.
-- `js/`: JavaScript-side package area; not implemented yet.
+- `js/`: dependency-free Playwright helpers for live element resolution, confirmed actions, and retries.
 
 ## Install The Godot Addon
 
@@ -170,10 +170,7 @@ cd cli
 # Open the game in a browser.
 playwright-cli open http://localhost:3000 --headed
 
-# Find the Chrome CDP port or pass --port directly.
-export GDPW_PORT=9222
-
-# See what the addon exposed.
+# See what the addon exposed. gdpw discovers playwright-cli's CDP port.
 gdpw list --visible
 
 # Get coordinates for an element.
@@ -188,6 +185,38 @@ playwright-cli mouseup
 gdpw wait route_loaded
 ```
 
+## Active Game Actions
+
+Moving game objects should be resolved immediately before browser input. `gdpw` remains read-only: these commands print one `playwright-cli run-code` command, and Playwright performs the input when the output is executed.
+
+```sh
+# Atomic browser-local click.
+gdpw get play_button --script | sh
+
+# Retry a moving-target drag only when the expected fresh event is missing.
+gdpw script drag enemy_1 \
+  --to 1000,260 \
+  --expect-event enemy_released \
+  --filter id=1 \
+  --retries 3 | sh
+```
+
+Every attempt re-reads `window.godotElements`, viewport scaling, and the canvas rectangle. Confirmation listeners are armed before input, and drag failures always attempt to release the mouse.
+
+For sustained active-game tests, import the JavaScript helper package in a Playwright test so decisions and input stay in one process:
+
+```js
+import { dragElement } from "@aviorstudio/gd-playwright";
+
+await dragElement(page, "enemy_1", {
+  to: { x: 1000, y: 260 },
+  confirm: { eventName: "enemy_released", filters: { id: 1 } },
+  retries: 3,
+});
+```
+
+Retries are not exactly-once delivery. Keep them disabled for non-idempotent actions unless the confirmation event uniquely identifies success.
+
 ## CLI Commands
 
 | Command | Description |
@@ -198,7 +227,8 @@ gdpw wait route_loaded
 | `events` | Show recent game events from `window.godotEvents`. |
 | `wait <event>` | Wait for a new event to appear. |
 | `watch` | Stream events in real time. |
-| `state` | Show aggregated state: elements, viewport, and latest events by type. |
+| `state` | Show aggregated state: test state, elements, viewport, and latest events by type. |
+| `script click/drag` | Generate atomic Playwright actions with optional fresh-event confirmation and retries. |
 
 `gdpw` resolves its browser connection in this order:
 
@@ -206,7 +236,9 @@ gdpw wait route_loaded
 2. `--port <N>`
 3. `GDPW_CDP`
 4. `GDPW_PORT`
-5. Auto-discovery on default ports `9222` and `9229`
+5. Auto-discovery from default ports and local browser `--remote-debugging-port` process arguments
+
+Auto-discovery checks every page target and selects the one exposing gd-playwright globals. This avoids attaching to a stale non-game tab when multiple Playwright or Chrome targets exist. Explicit `--cdp` remains available when process inspection is unavailable or the browser is remote.
 
 ## Project Settings
 
@@ -243,18 +275,18 @@ The Godot addon writes generic browser globals during enabled web runs:
 - `gd/addon/`: Godot plugin source packaged for GDAM and manual installation.
 - `gd/tests/`: Godot test project/scripts for addon behavior.
 - `cli/`: Go `gdpw` CLI source and build scripts.
-- `js/`: reserved JavaScript package area for future browser/runtime helpers.
+- `js/`: JavaScript Playwright helpers and tests.
 - `.github/workflows/ci.yml`: runs Godot addon tests and Go CLI tests.
 - `.github/workflows/release.yml`: creates addon and CLI GitHub releases.
 
 ## Versioning And Releases
 
-This repo has two implemented release targets:
+This repo currently has two automated release targets:
 
 - `gd`: uses `gd-v*` tags, verifies `gd/addon/plugin.cfg`, builds `@aviorstudio_gd-playwright.zip`, and publishes `@aviorstudio/gd-playwright` to GDAM.
 - `cli`: uses `cli-v*` tags, runs Go tests, builds `gdpw` binaries for Linux, macOS, and Windows, and attaches checksums.
 
-The `js/` package is reserved and has no release target yet. The release workflow is manual and must be run from `main` with a `patch`, `minor`, or `major` bump.
+The implemented `js/` package does not yet have an automated release target. The release workflow is manual and must be run from `main` with a `patch`, `minor`, or `major` bump.
 
 ## Testing
 
@@ -263,9 +295,10 @@ Run locally with:
 ```sh
 mise exec -- ./gd/tests/test.sh
 cd cli && mise exec -- go test ./...
+cd js && mise exec -- bun test
 ```
 
-CI runs both implemented test suites.
+CI runs all three test suites.
 
 ## License
 

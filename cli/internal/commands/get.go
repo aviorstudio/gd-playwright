@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aviorstudio/gd-playwright/cli/internal/cdp"
+	"github.com/aviorstudio/gd-playwright/cli/internal/runcode"
 	"github.com/aviorstudio/gd-playwright/cli/internal/scaling"
 	"github.com/aviorstudio/gd-playwright/cli/internal/types"
 	"github.com/spf13/cobra"
@@ -27,7 +28,8 @@ The coordinates can be passed directly to playwright-cli mousemove.
 
 Multiple keys can be provided to batch-query in a single CDP call.
 By default, refuses to return coordinates for invisible elements (use --force to override).
-Use --script to output playwright-cli commands you can copy/paste or pipe.`,
+Use --script to output one atomic playwright-cli run-code command per key. The
+browser resolves each coordinate immediately before clicking.`,
 		Example: `  gdpw get battle_button
   gdpw get tile_4_3 tile_4_2 tile_3_3
   gdpw get battle_button --json
@@ -35,6 +37,16 @@ Use --script to output playwright-cli commands you can copy/paste or pipe.`,
   gdpw get battle_button --script`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if script && !jsonOutput {
+				for _, key := range args {
+					code, err := runcode.RenderAction(runcode.ActionOptions{Action: "click", Key: key, Force: force})
+					if err != nil {
+						return err
+					}
+					fmt.Println(runcode.ShellCommand(code))
+				}
+				return nil
+			}
 			client, err := connect()
 			if err != nil {
 				return err
@@ -136,10 +148,6 @@ Use --script to output playwright-cli commands you can copy/paste or pipe.`,
 					}
 					b, _ := json.Marshal(out)
 					fmt.Println(string(b))
-				} else if script {
-					fmt.Printf("playwright-cli mousemove %d %d\n", pos.X, pos.Y)
-					fmt.Println("playwright-cli mousedown")
-					fmt.Println("playwright-cli mouseup")
 				} else if multiKey {
 					fmt.Printf("%s %d %d\n", key, pos.X, pos.Y)
 				} else {
@@ -156,7 +164,7 @@ Use --script to output playwright-cli commands you can copy/paste or pipe.`,
 
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output full position data as JSON")
 	cmd.Flags().BoolVar(&force, "force", false, "return coordinates even for invisible elements")
-	cmd.Flags().BoolVar(&script, "script", false, "output playwright-cli click commands")
+	cmd.Flags().BoolVar(&script, "script", false, "output atomic playwright-cli run-code clicks")
 	return cmd
 }
 

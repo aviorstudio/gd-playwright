@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -48,29 +49,93 @@ func Connect(wsURL string) (*Client, error) {
 	return &Client{conn: conn}, nil
 }
 
-// ConnectFromPort discovers the page target and connects via CDP.
+// ConnectFromPort prefers the page exposing gd-playwright state. It falls back
+// to the first page so status can still report that a loading game is not ready.
 func ConnectFromPort(port int) (*Client, error) {
-	wsURL, err := DiscoverFromPort(port)
+	targets, err := DiscoverTargets(fmt.Sprintf("http://localhost:%d", port))
 	if err != nil {
 		return nil, err
 	}
-	return Connect(wsURL)
-}
-
-// AutoConnect tries default CDP ports and returns the first successful connection.
-func AutoConnect() (*Client, error) {
-	for _, port := range DefaultPorts() {
-		wsURL, err := DiscoverFromPort(port)
-		if err != nil {
-			continue
-		}
-		client, err := Connect(wsURL)
-		if err != nil {
-			continue
-		}
+	if client := connectMatchingTarget(targets); client != nil {
 		return client, nil
 	}
-	return nil, fmt.Errorf("could not auto-discover browser on ports %v", DefaultPorts())
+	for _, target := range targets {
+		if target.Type == "page" && target.WebSocketDebuggerURL != "" {
+			return Connect(target.WebSocketDebuggerURL)
+		}
+	}
+	return nil, fmt.Errorf("no page target found on port %d", port)
+}
+
+// AutoConnect checks default and process-discovered CDP ports, returning the
+// page that actually exposes gd-playwright state.
+func AutoConnect() (*Client, error) {
+	ports := CandidatePorts()
+	const readinessAttempts = 30
+	for attempt := 0; attempt < readinessAttempts; attempt++ {
+		waitingForPage := false
+		for _, port := range ports {
+			targets, err := DiscoverTargets(fmt.Sprintf("http://localhost:%d", port))
+			if err != nil {
+				continue
+			}
+			if client := connectMatchingTarget(targets); client != nil {
+				return client, nil
+			}
+			// Candidate ports are newest-first. Give the newest live browser time
+			// to finish loading Godot before considering an older session.
+			if hasPageTarget(targets) {
+				waitingForPage = true
+				break
+			}
+		}
+		if !waitingForPage {
+			break
+		}
+		if attempt < readinessAttempts-1 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	// If the newest browser was unrelated, look for a ready game in older
+	// sessions before reporting failure.
+	for _, port := range ports {
+		targets, err := DiscoverTargets(fmt.Sprintf("http://localhost:%d", port))
+		if err == nil {
+			if client := connectMatchingTarget(targets); client != nil {
+				return client, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("could not auto-discover a gd-playwright page on ports %v", ports)
+}
+
+func hasPageTarget(targets []Target) bool {
+	for _, target := range targets {
+		if target.Type == "page" && target.WebSocketDebuggerURL != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func connectMatchingTarget(targets []Target) *Client {
+	for _, target := range targets {
+		if target.Type != "page" || target.WebSocketDebuggerURL == "" {
+			continue
+		}
+		client, err := Connect(target.WebSocketDebuggerURL)
+		if err != nil {
+			continue
+		}
+		var ready bool
+		err = client.EvaluateJSON(`window.godotElements != null || window.godotEvents != null || window.godotTestState != null`, &ready)
+		if err == nil && ready {
+			return client
+		}
+		client.Close()
+	}
+	return nil
 }
 
 // Evaluate runs a JavaScript expression in the page and returns the raw JSON result.

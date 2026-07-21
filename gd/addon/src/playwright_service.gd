@@ -181,6 +181,8 @@ func _scan_node_recursive(node: Node, element_map_service: ElementMapService) ->
 			for child in node.get_children():
 				if child is PlaywrightTagNode:
 					already_tagged = true
+					child.set_element_map(element_map_service)
+					child.refresh_registration()
 					break
 			if not already_tagged:
 				var tag := PlaywrightTagNode.new()
