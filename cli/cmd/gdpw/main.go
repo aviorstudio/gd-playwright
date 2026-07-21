@@ -27,13 +27,12 @@ element positions and events emitted by gd-playwright.
 Use alongside playwright-cli: gdpw provides coordinates,
 playwright-cli performs clicks and inputs.
 
-Environment variables:
+Optional connection overrides:
   GDPW_PORT  CDP port (avoids --port on every command)
   GDPW_CDP   CDP websocket endpoint (avoids --cdp on every command)
 
 Example:
   playwright-cli open http://localhost:8060 --headed
-  export GDPW_PORT=9222
   gdpw list --visible
   gdpw get battle_button        # → 360 640
   playwright-cli mousemove 360 640
@@ -82,6 +81,7 @@ Example:
 	rootCmd.AddCommand(commands.NewWaitCmd(connect))
 	rootCmd.AddCommand(commands.NewStateCmd(connect))
 	rootCmd.AddCommand(commands.NewWatchCmd(connect))
+	rootCmd.AddCommand(commands.NewScriptCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

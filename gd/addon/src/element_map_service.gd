@@ -149,8 +149,7 @@ func flush_to_browser() -> void:
 ## Clears all registered elements.
 func clear() -> void:
 	_elements.clear()
-	_dirty = false
-	_flush_scheduled = false
+	_mark_dirty()
 
 func _mark_dirty() -> void:
 	_dirty = true

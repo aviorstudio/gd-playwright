@@ -1,6 +1,7 @@
 extends SceneTree
 
 const PlaywrightTagNode = preload("res://addon/src/playwright_tag_node.gd")
+const ElementMapService = preload("res://addon/src/element_map_service.gd")
 
 func _initialize() -> void:
 	var failures: Array[String] = []
@@ -8,6 +9,7 @@ func _initialize() -> void:
 	_test_normalize_name_preserves_snake_case(failures)
 	_test_tag_key_used_when_set(failures)
 	_test_no_element_map_disables_processing(failures)
+	_test_refresh_registration_restores_cleared_entry(failures)
 
 	if failures.is_empty():
 		print("PASS gd-playwright playwright_tag_node_test")
@@ -53,3 +55,23 @@ func _test_no_element_map_disables_processing(failures: Array[String]) -> void:
 	if tag._element_map != null:
 		failures.append("Expected null element map before injection")
 	tag.free()
+
+func _test_refresh_registration_restores_cleared_entry(failures: Array[String]) -> void:
+	var element_map := ElementMapService.new()
+	var control := Control.new()
+	control.position = Vector2(10, 20)
+	control.size = Vector2(30, 40)
+	var tag := PlaywrightTagNode.new()
+	tag.tag_key = "moving_target"
+	tag.poll_interval = 0.0
+	tag.set_element_map(element_map)
+	control.add_child(tag)
+	get_root().add_child(control)
+	tag.refresh_registration()
+	if not element_map.has_element("moving_target"):
+		failures.append("Expected tag to register its element")
+	element_map.clear()
+	tag.refresh_registration()
+	if not element_map.has_element("moving_target"):
+		failures.append("Expected refresh_registration to restore a cleared entry")
+	control.free()

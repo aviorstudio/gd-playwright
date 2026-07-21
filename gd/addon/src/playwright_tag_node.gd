@@ -9,14 +9,15 @@ extends Node
 
 const ElementMapService = preload("element_map_service.gd")
 
-const POLL_INTERVAL: float = 0.1
-
 @export var tag_key: String = "":
 	set(value):
 		tag_key = value.strip_edges()
 		update_configuration_warnings()
 @export var include_size: bool = true
 @export var service_path: NodePath = NodePath("/root/PlaywrightService")
+## Seconds between position samples. Set to 0 for every rendered frame when
+## exposing fast-moving gameplay objects.
+@export_range(0.0, 1.0, 0.01, "or_greater", "suffix:s") var poll_interval: float = 0.1
 
 var _resolved_key: String = ""
 var _element_map: ElementMapService = null
@@ -28,6 +29,16 @@ var _poll_timer: float = 0.0
 
 func set_element_map(element_map: ElementMapService) -> void:
 	_element_map = element_map
+
+func refresh_registration() -> void:
+	_resolved_key = get_resolved_key_preview()
+	if _element_map == null or _resolved_key.is_empty():
+		return
+	_last_center = Vector2(-99999, -99999)
+	_last_size = Vector2(-1, -1)
+	_last_visible = not _last_visible
+	_push_position()
+	_registered = true
 
 func get_resolved_key_preview() -> String:
 	if not tag_key.is_empty():
@@ -44,8 +55,7 @@ func _ready() -> void:
 	_resolved_key = get_resolved_key_preview()
 	if _resolved_key.is_empty():
 		return
-	_push_position()
-	_registered = true
+	refresh_registration()
 	set_process(true)
 
 func _exit_tree() -> void:
@@ -57,8 +67,11 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if not _registered:
 		return
+	if is_zero_approx(poll_interval):
+		_push_position()
+		return
 	_poll_timer += delta
-	if _poll_timer < POLL_INTERVAL:
+	if _poll_timer < poll_interval:
 		return
 	_poll_timer = 0.0
 	_push_position()

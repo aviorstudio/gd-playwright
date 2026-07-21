@@ -99,8 +99,8 @@ func _test_clear_removes_all(failures: Array[String]) -> void:
 
 	if service.get_element_count() != 0:
 		failures.append("Expected element count=0 after clear")
-	if service.is_dirty():
-		failures.append("Expected service to not be dirty after clear")
+	if not service.is_dirty():
+		failures.append("Expected clear to mark the browser element map dirty")
 
 func _test_empty_key_rejected(failures: Array[String]) -> void:
 	var service := ElementMapService.new()
