@@ -4,12 +4,16 @@ const PlaywrightTagNode = preload("res://addon/src/playwright_tag_node.gd")
 const ElementMapService = preload("res://addon/src/element_map_service.gd")
 
 func _initialize() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
 	var failures: Array[String] = []
 	_test_normalize_name_converts_pascal_to_snake(failures)
 	_test_normalize_name_preserves_snake_case(failures)
 	_test_tag_key_used_when_set(failures)
 	_test_no_element_map_disables_processing(failures)
 	_test_refresh_registration_restores_cleared_entry(failures)
+	_test_replaced_tag_cannot_mutate_or_remove_new_entry(failures)
 
 	if failures.is_empty():
 		print("PASS gd-playwright playwright_tag_node_test")
@@ -75,3 +79,31 @@ func _test_refresh_registration_restores_cleared_entry(failures: Array[String]) 
 	if not element_map.has_element("moving_target"):
 		failures.append("Expected refresh_registration to restore a cleared entry")
 	control.free()
+
+func _test_replaced_tag_cannot_mutate_or_remove_new_entry(failures: Array[String]) -> void:
+	var element_map := ElementMapService.new()
+	var old_control := Control.new()
+	var new_control := Control.new()
+	var old_tag := PlaywrightTagNode.new()
+	var new_tag := PlaywrightTagNode.new()
+	old_tag.tag_key = "shared_tab"
+	new_tag.tag_key = "shared_tab"
+	old_tag.set_element_map(element_map)
+	new_tag.set_element_map(element_map)
+	old_control.add_child(old_tag)
+	new_control.add_child(new_tag)
+	get_root().add_child(old_control)
+	get_root().add_child(new_control)
+	old_tag.refresh_registration()
+	new_tag.refresh_registration()
+	var replacement: ElementMapService.ElementEntry = element_map.get_entry("shared_tab")
+	old_control.position = Vector2(700, 900)
+	old_tag._push_position()
+	if element_map.get_entry("shared_tab") != replacement or replacement.center_x != 0:
+		failures.append("An outgoing tag must not update a replacement registration")
+	old_control.free()
+	if element_map.get_entry("shared_tab") != replacement:
+		failures.append("An outgoing tag must not unregister a replacement registration")
+	new_control.free()
+	if element_map.has_element("shared_tab"):
+		failures.append("The current owner must remove its own registration on teardown")
