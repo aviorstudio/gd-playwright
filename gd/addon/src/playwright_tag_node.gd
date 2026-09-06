@@ -22,22 +22,26 @@ const ElementMapService = preload("element_map_service.gd")
 var _resolved_key: String = ""
 var _element_map: ElementMapService = null
 var _registered: bool = false
+var _owned_entry: ElementMapService.ElementEntry = null
 var _last_center: Vector2 = Vector2(-99999, -99999)
 var _last_size: Vector2 = Vector2(-1, -1)
 var _last_visible: bool = false
 var _poll_timer: float = 0.0
 
 func set_element_map(element_map: ElementMapService) -> void:
+	if _element_map != element_map:
+		_release_registration()
 	_element_map = element_map
 
 func refresh_registration() -> void:
+	_release_registration()
 	_resolved_key = get_resolved_key_preview()
 	if _element_map == null or _resolved_key.is_empty():
 		return
 	_last_center = Vector2(-99999, -99999)
 	_last_size = Vector2(-1, -1)
 	_last_visible = not _last_visible
-	_push_position()
+	_push_position(true)
 	_registered = true
 
 func get_resolved_key_preview() -> String:
@@ -58,10 +62,16 @@ func _ready() -> void:
 	refresh_registration()
 	set_process(true)
 
-func _exit_tree() -> void:
-	if _registered and _element_map != null and not _resolved_key.is_empty():
+func _release_registration() -> void:
+	# A newer scene can claim this key before the outgoing scene exits. Entry
+	# identity is the lease: stale nodes may neither update nor remove it.
+	if _owned_entry != null and _element_map != null and _element_map.get_entry(_resolved_key) == _owned_entry:
 		_element_map.unregister(_resolved_key)
-		_registered = false
+	_owned_entry = null
+	_registered = false
+
+func _exit_tree() -> void:
+	_release_registration()
 	set_process(false)
 
 func _process(delta: float) -> void:
@@ -76,7 +86,7 @@ func _process(delta: float) -> void:
 	_poll_timer = 0.0
 	_push_position()
 
-func _push_position() -> void:
+func _push_position(claim_registration: bool = false) -> void:
 	if _element_map == null or _resolved_key.is_empty():
 		return
 	var parent_node: Node = get_parent()
@@ -97,7 +107,12 @@ func _push_position() -> void:
 		visible = node_2d.is_visible_in_tree()
 	else:
 		return
-	if center == _last_center and size == _last_size and visible == _last_visible:
+	if claim_registration:
+		_element_map.register(_resolved_key, center, size, visible)
+		_owned_entry = _element_map.get_entry(_resolved_key)
+	elif _owned_entry == null or _element_map.get_entry(_resolved_key) != _owned_entry:
+		return
+	elif center == _last_center and size == _last_size and visible == _last_visible:
 		return
 	_last_center = center
 	_last_size = size
