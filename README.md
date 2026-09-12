@@ -265,7 +265,7 @@ The Godot addon writes generic browser globals during enabled web runs:
 
 ## Safety Notes
 
-- Features only run in web builds when debug mode, `enabled`, or `test_mode` is active.
+- Features only run in web builds when debug mode, `enabled`, or `test_mode` is active. The production-export choice remains tracked by [fieldsofrevik#148](https://github.com/aviorstudio/fieldsofrevik/issues/148); this release does not choose between excluding diagnostics and a dedicated production automation feature.
 - Calls are safe to leave in game code because disabled features no-op.
 - Do not expose private player data through test state or event payloads.
 - Game-specific knowledge belongs in game docs or skills, not in `gdpw`.
@@ -276,7 +276,7 @@ The Godot addon writes generic browser globals during enabled web runs:
 - `gd/tests/`: Godot test project/scripts for addon behavior.
 - `cli/`: Go `gdpw` CLI source and build scripts.
 - `js/`: JavaScript Playwright helpers and tests.
-- `.github/workflows/ci.yml`: runs Godot addon tests and Go CLI tests.
+- `.github/workflows/ci.yml`: runs the Go, Godot, and JavaScript suites plus package controls.
 - `.github/workflows/release.yml`: creates addon and CLI GitHub releases.
 
 ## Versioning And Releases
@@ -298,7 +298,7 @@ cd cli && mise exec -- go test ./...
 cd js && mise exec -- bun test
 ```
 
-CI runs all three test suites.
+**Correction ([fieldsofrevik#148](https://github.com/aviorstudio/fieldsofrevik/issues/148)):** this README previously said CI ran all three suites, while the common action omitted `js/index.test.js` and the GD release bypassed the common Godot gate. CI and both release targets now run Go, Godot 4.7.2, and JavaScript tests. The GD path additionally tests the exact closed-manifest ZIP through clean editor enable, restart, disable, restart, smoke, and ownership-cleanup checks before transporting those same bytes to publication.
 
 ## License
 
