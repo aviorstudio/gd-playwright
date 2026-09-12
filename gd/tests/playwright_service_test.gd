@@ -12,12 +12,24 @@ class FakePlaywrightService extends PlaywrightServiceModule:
 		captured_payload = data.duplicate(true)
 		call_count += 1
 
+class RecordingWebService extends PlaywrightServiceModule:
+	var scripts: Array[String] = []
+
+	func _is_web_runtime() -> bool:
+		return true
+
+	func _browser_eval(code: String) -> Variant:
+		scripts.append(code)
+		return null
+
 func _initialize() -> void:
 	var failures: Array[String] = []
 	_test_emit_event_delegates_to_browser_emitter(failures)
 	_test_emit_namespaced_event_delegates_to_browser_emitter(failures)
 	_test_configure_retains_buffer_and_flag_settings(failures)
 	_test_meta_key_constant(failures)
+	_test_cleanup_is_owner_guarded_and_complete(failures)
+	_test_stale_instance_cleanup_cannot_claim_another_owner(failures)
 
 	if failures.is_empty():
 		print("PASS gd-playwright playwright_service_test")
@@ -72,3 +84,41 @@ func _test_configure_retains_buffer_and_flag_settings(failures: Array[String]) -
 func _test_meta_key_constant(failures: Array[String]) -> void:
 	if PlaywrightServiceModule.META_KEY != "playwright":
 		failures.append("Expected META_KEY to be 'playwright', got '%s'" % PlaywrightServiceModule.META_KEY)
+
+func _test_cleanup_is_owner_guarded_and_complete(failures: Array[String]) -> void:
+	var service := RecordingWebService.new()
+	service.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, false, false))
+	var owner_id := service._browser_owner_id
+	service._cleanup_browser_bridge()
+	if service.scripts.size() != 2:
+		failures.append("Expected one bridge claim and one cleanup script")
+		service.free()
+		return
+	var cleanup := service.scripts[1]
+	if not cleanup.contains("window.__gdPlaywrightOwner ===") or not cleanup.contains(owner_id):
+		failures.append("Expected cleanup to require the current service owner identity")
+	for global_name: String in ["godotElements", "godotElementsViewport", "godotEvents", "godotTestState", "__gdPlaywrightEventWaiters"]:
+		if not cleanup.contains("delete window." + global_name):
+			failures.append("Expected cleanup to remove owned global " + global_name)
+	if not cleanup.contains("__waiter.cancel()"):
+		failures.append("Expected cleanup to cancel helper listeners before deleting their registry")
+	if not service._browser_owner_id.is_empty():
+		failures.append("Expected local browser owner identity to clear after cleanup")
+	service.free()
+
+func _test_stale_instance_cleanup_cannot_claim_another_owner(failures: Array[String]) -> void:
+	var first := RecordingWebService.new()
+	var second := RecordingWebService.new()
+	first.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, false, false))
+	second.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, false, false))
+	var first_owner := first._browser_owner_id
+	var second_owner := second._browser_owner_id
+	if first_owner == second_owner:
+		failures.append("Expected independent service instances to use unique browser owners")
+	first._cleanup_browser_bridge()
+	var stale_cleanup := first.scripts[-1]
+	if not stale_cleanup.contains(first_owner) or stale_cleanup.contains(second_owner):
+		failures.append("Expected stale cleanup to be scoped only to the stale owner")
+	second._cleanup_browser_bridge()
+	first.free()
+	second.free()

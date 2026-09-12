@@ -144,7 +144,10 @@ func flush_to_browser() -> void:
 		};
 		window.dispatchEvent(new CustomEvent('godot-elements-updated', { detail: __payload }));
 	""" % json_string
-	JavaScriptBridge.eval(js_code)
+	if _owner != null and _owner.has_method("_browser_eval"):
+		_owner.call("_browser_eval", js_code)
+	else:
+		JavaScriptBridge.eval(js_code)
 
 ## Clears all registered elements.
 func clear() -> void:
