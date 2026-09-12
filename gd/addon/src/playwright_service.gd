@@ -45,21 +45,29 @@ const DEFAULT_EVENT_BUFFER_TRIM := 500
 
 var _config: PlaywrightConfig = null
 var _element_map: ElementMapService = null
+var _browser_owner_id: String = ""
 
 func configure(config: PlaywrightConfig) -> void:
 	_config = config if config else _config_from_project_settings()
+	if not _is_web_runtime():
+		return
+	if _should_emit_events():
+		_claim_browser_bridge()
+	else:
+		_cleanup_browser_bridge()
 
 func get_config() -> PlaywrightConfig:
 	return _config
 
 func _ready() -> void:
-	if not OS.has_feature("web"):
+	if not _is_web_runtime():
 		return
 	if not _is_test_mode_enabled():
 		return
 	_on_test_mode_ready()
 
 func _on_test_mode_ready() -> void:
+	_claim_browser_bridge()
 	_element_map = ElementMapService.new()
 	_element_map.setup(self)
 	emit_event("service_ready")
@@ -126,7 +134,8 @@ func set_test_state(state_namespace_name: String, state: Dictionary) -> void:
 		return
 	var json_string: String = JSON.stringify(state)
 	var namespace_json: String = JSON.stringify(state_namespace)
-	JavaScriptBridge.eval("window.godotTestState = window.godotTestState || {}; window.godotTestState[%s] = %s;" % [namespace_json, json_string])
+	_claim_browser_bridge()
+	_browser_eval("window.godotTestState = window.godotTestState || {}; window.godotTestState[%s] = %s;" % [namespace_json, json_string])
 
 ## Clears one window.godotTestState namespace.
 ## No-op when the service is disabled.
@@ -137,7 +146,8 @@ func clear_test_state(state_namespace_name: String) -> void:
 	if state_namespace.is_empty():
 		return
 	var namespace_json: String = JSON.stringify(state_namespace)
-	JavaScriptBridge.eval("if (window.godotTestState) { delete window.godotTestState[%s]; }" % namespace_json)
+	_claim_browser_bridge()
+	_browser_eval("if (window.godotTestState) { delete window.godotTestState[%s]; }" % namespace_json)
 
 ## Called by ElementMapService via deferred call when the map is dirty.
 ## No-op when the service is disabled.
@@ -145,6 +155,7 @@ func _on_element_map_flush_requested() -> void:
 	if not _should_emit_events():
 		return
 	if _element_map != null:
+		_claim_browser_bridge()
 		_element_map.flush_to_browser()
 
 ## Scans the current scene tree for nodes with set_meta("playwright", "key")
@@ -209,7 +220,8 @@ func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 
 	var config: PlaywrightConfig = _resolve_config()
 	if config.log_events:
-		JavaScriptBridge.eval("console.log('[GD_PLAYWRIGHT_EVENT]', " + json_string + ")")
+		_claim_browser_bridge()
+		_browser_eval("console.log('[GD_PLAYWRIGHT_EVENT]', " + json_string + ")")
 
 	var buffer_max: int = maxi(config.buffer_max, 0)
 	var buffer_trim: int = maxi(config.buffer_trim, 0)
@@ -229,10 +241,11 @@ func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 		window.godotEvents.push(%s);
 		window.dispatchEvent(new CustomEvent('godot-event', { detail: %s }));
 	""" % [json_string, json_string]
-	JavaScriptBridge.eval(js_code)
+	_claim_browser_bridge()
+	_browser_eval(js_code)
 
 func _should_emit_events() -> bool:
-	if not OS.has_feature("web"):
+	if not _is_web_runtime():
 		return false
 	var config: PlaywrightConfig = _resolve_config()
 
@@ -243,6 +256,45 @@ func _should_emit_events() -> bool:
 		return true
 
 	return OS.is_debug_build()
+
+func _exit_tree() -> void:
+	_cleanup_browser_bridge()
+
+func _claim_browser_bridge() -> void:
+	if not _is_web_runtime():
+		return
+	if _browser_owner_id.is_empty():
+		_browser_owner_id = "%s:%s" % [str(get_instance_id()), str(Time.get_ticks_usec())]
+	_browser_eval("window.__gdPlaywrightOwner = %s;" % JSON.stringify(_browser_owner_id))
+
+func _cleanup_browser_bridge() -> void:
+	if not _is_web_runtime() or _browser_owner_id.is_empty():
+		return
+	var owner_json := JSON.stringify(_browser_owner_id)
+	_browser_eval("""
+		if (window.__gdPlaywrightOwner === %s) {
+			var __waiters = window.__gdPlaywrightEventWaiters;
+			if (__waiters instanceof Map) {
+				for (var __waiter of __waiters.values()) {
+					if (__waiter && typeof __waiter.cancel === 'function') { __waiter.cancel(); }
+				}
+			}
+			delete window.__gdPlaywrightEventWaiters;
+			delete window.godotElements;
+			delete window.godotElementsViewport;
+			delete window.godotEvents;
+			delete window.godotTestState;
+			delete window.__gdPlaywrightOwner;
+			window.dispatchEvent(new CustomEvent('gd-playwright-cleanup', { detail: { owner: %s } }));
+		}
+	""" % [owner_json, owner_json])
+	_browser_owner_id = ""
+
+func _browser_eval(code: String) -> Variant:
+	return JavaScriptBridge.eval(code)
+
+func _is_web_runtime() -> bool:
+	return OS.has_feature("web")
 
 func _is_test_mode_enabled() -> bool:
 	var config: PlaywrightConfig = _resolve_config()
