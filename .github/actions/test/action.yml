@@ -7,10 +7,11 @@ description: >
   job, under the caller's name -- CI / Test, Release / Test -- rather than as a
   nested "caller / callee" check.
 
-  ONE definition, called by CI and by Release both. Release did not run any of
-  this before: it read the version, packaged the addon and published it, so the
-  only thing between a broken commit and the registry was whether somebody
-  looked at CI first.
+  Correction (aviorstudio/fieldsofrevik#148): the earlier text said this one
+  definition guarded release, but the GD release bypassed it and this action
+  omitted the shipped JavaScript suite. CI and Release now call this action,
+  which runs Go, Godot, JavaScript, runner controls, and the exact GD package
+  lifecycle gate.
 
   A per-repo copy, not a shared action. `uses: ./` is repo-local, so the
   fourteen copies of this file are copies -- the accepted cost of no repo's CI
@@ -19,23 +20,23 @@ description: >
 runs:
   using: composite
   steps:
-    # The addon's own file manifest. Listed rather than globbed: a file dropped
-    # in a refactor is exactly what this catches, and a glob would happily match
-    # whatever was left.
-    - name: Validate addon package
+    - name: Validate shipped suite and package inputs
       shell: bash
       run: |
         set -euo pipefail
-        test -f gd/addon/plugin.cfg
-        test -f gd/addon/plugin.gd
-        test -f gd/addon/autoload.gd
-        test -f gd/addon/src/playwright_service.gd
-        test -f gd/addon/src/playwright_tag_node.gd
-        test -f gd/addon/src/playwright_state_publisher.gd
-        test -f gd/addon/src/playwright_event_emitter.gd
-        test -f gd/addon/src/element_map_service.gd
-        test -f gd/addon/examples/app_shell/playwright_example_screen.tscn
-        test -f gd/addon/examples/app_shell/playwright_example_screen.gd
+        test -s cli/go.mod
+        test -n "$(find cli -name '*_test.go' -type f -print -quit)"
+        test -s js/index.test.js
+        test -s gd/package-manifest.txt
+        test -n "$(find gd/tests -name '*_test.gd' -type f -print -quit)"
+
+    - name: Package gate controls
+      shell: bash
+      run: PYTHONPATH=tools python3 -m unittest -v tools/package_gd_test.py
+
+    - name: Godot runner controls
+      shell: bash
+      run: bash gd/tests/test_runner_test.sh
 
     # No `if: hashFiles(...)` guard. This step used to skip itself when
     # cli/go.mod was absent, which is indistinguishable from the module being
@@ -45,6 +46,11 @@ runs:
       shell: bash
       working-directory: cli
       run: go test ./...
+
+    - name: JavaScript tests
+      shell: bash
+      working-directory: js
+      run: bun test
 
     - name: Install verified Godot test binary
       shell: bash
@@ -64,3 +70,16 @@ runs:
     - name: Godot regression tests
       shell: bash
       run: bash gd/tests/test.sh
+
+    - name: Build and inspect exact GD release ZIP
+      shell: bash
+      run: |
+        set -euo pipefail
+        rm -rf dist
+        python3 tools/package_gd.py
+        python3 tools/verify_gd_package.py dist/@aviorstudio_gd-playwright.zip \
+          | tee dist/gd-package-digests.txt
+
+    - name: Install exact ZIP and verify editor lifecycle
+      shell: bash
+      run: bash gd/tests/package_lifecycle_test.sh dist/@aviorstudio_gd-playwright.zip
