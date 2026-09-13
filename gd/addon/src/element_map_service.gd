@@ -51,6 +51,8 @@ func setup(owner: Node) -> void:
 func register(key: String, center: Vector2, size: Vector2, visible: bool) -> void:
 	if key.is_empty():
 		return
+	if _owner != null and _owner.has_method("_allows_element_key") and not bool(_owner.call("_allows_element_key", key)):
+		return
 	var entry := ElementEntry.new(
 		key,
 		int(center.x),

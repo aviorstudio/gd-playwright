@@ -10,8 +10,8 @@ description: >
   Correction (aviorstudio/fieldsofrevik#148): the earlier text said this one
   definition guarded release, but the GD release bypassed it and this action
   omitted the shipped JavaScript suite. CI and Release now call this action,
-  which runs Go, Godot, JavaScript, runner controls, and the exact GD package
-  lifecycle gate.
+  which runs Go, Godot, JavaScript, runner controls, the exact GD package
+  lifecycle gate, and ordinary/diagnostic release-export browser checks.
 
   A per-repo copy, not a shared action. `uses: ./` is repo-local, so the
   fourteen copies of this file are copies -- the accepted cost of no repo's CI
@@ -83,3 +83,42 @@ runs:
     - name: Install exact ZIP and verify editor lifecycle
       shell: bash
       run: bash gd/tests/package_lifecycle_test.sh dist/@aviorstudio_gd-playwright.zip
+
+    - name: Install verified Godot web export templates
+      shell: bash
+      run: |
+        set -euo pipefail
+        archive="$RUNNER_TEMP/Godot_v4.7.2-stable_export_templates.tpz"
+        unpack="$RUNNER_TEMP/gd-playwright-export-templates"
+        destination="${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/4.7.2.stable"
+        curl --fail --location --retry 3 --max-time 300 \
+          https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz \
+          --output "$archive"
+        printf '%s  %s\n' 'ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079' "$archive" | sha512sum --check
+        rm -rf "$unpack" "$destination"
+        mkdir -p "$unpack" "$destination"
+        unzip -q "$archive" -d "$unpack"
+        cp -a "$unpack/templates/." "$destination/"
+        test -s "$destination/web_release.zip"
+
+    - name: Install pinned Playwright CLI and Chromium
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm install --global @playwright/cli@0.1.18
+        npx --yes playwright@1.63.0-alpha-2026-08-05 install --with-deps chromium
+        test "$(playwright-cli --version)" = "0.1.18"
+
+    - name: Verify ordinary and diagnostic web release artifacts
+      shell: bash
+      env:
+        GD_WEB_OUTPUT_DIR: ${{ github.workspace }}/dist/web-export-evidence
+      run: bash gd/tests/web_export_test.sh dist/@aviorstudio_gd-playwright.zip
+
+    - name: Upload web release acceptance evidence
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: gd-web-evidence-${{ github.run_id }}-${{ github.job }}
+        path: dist/web-export-evidence/
+        if-no-files-found: error
+        retention-days: 30
