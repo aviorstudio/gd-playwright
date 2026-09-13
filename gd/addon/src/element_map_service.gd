@@ -51,6 +51,8 @@ func setup(owner: Node) -> void:
 func register(key: String, center: Vector2, size: Vector2, visible: bool) -> void:
 	if key.is_empty():
 		return
+	if _owner != null and _owner.has_method("_allows_element_key") and not bool(_owner.call("_allows_element_key", key)):
+		return
 	var entry := ElementEntry.new(
 		key,
 		int(center.x),
@@ -144,7 +146,10 @@ func flush_to_browser() -> void:
 		};
 		window.dispatchEvent(new CustomEvent('godot-elements-updated', { detail: __payload }));
 	""" % json_string
-	JavaScriptBridge.eval(js_code)
+	if _owner != null and _owner.has_method("_browser_eval"):
+		_owner.call("_browser_eval", js_code)
+	else:
+		JavaScriptBridge.eval(js_code)
 
 ## Clears all registered elements.
 func clear() -> void:

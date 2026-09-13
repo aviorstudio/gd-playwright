@@ -265,10 +265,26 @@ The Godot addon writes generic browser globals during enabled web runs:
 
 ## Safety Notes
 
-- Features only run in web builds when debug mode, `enabled`, or `test_mode` is active. The production-export choice remains tracked by [fieldsofrevik#148](https://github.com/aviorstudio/fieldsofrevik/issues/148); this release does not choose between excluding diagnostics and a dedicated production automation feature.
+- Debug web builds retain the existing `enabled`/`test_mode` behavior. Ordinary release exports never create gd-playwright browser globals, even when those settings are enabled.
+- Production diagnostics require a separate export preset with the custom feature `gd_playwright_diagnostics`. Configure `PlaywrightConfig` with a `PlaywrightPayloadPolicy`: exact element keys and prefixes, event-name to allowed-field rules, and state-namespace to allowed-field rules. Empty or missing rules deny publication.
+- Diagnostic release payloads must contain only JSON-safe values. Known credential-like keys (including `token`, `password`, `secret`, cookies, session values, API keys, and private keys) are rejected recursively. This is a bounded guard, not a confidentiality or exhaustive secret-detection guarantee; games remain responsible for publishing only non-sensitive diagnostic data.
 - Calls are safe to leave in game code because disabled features no-op.
 - Do not expose private player data through test state or event payloads.
 - Game-specific knowledge belongs in game docs or skills, not in `gdpw`.
+
+Example diagnostic release configuration:
+
+```gdscript
+var policy := PlaywrightServiceModule.PlaywrightPayloadPolicy.new(
+	PackedStringArray(["start_button"]),
+	PackedStringArray(["unit_"]),
+	{"route_loaded": PackedStringArray(["route"])},
+	{"fixture": PackedStringArray(["route", "ready"])}
+)
+PlaywrightService.configure(
+	PlaywrightServiceModule.PlaywrightConfig.new(true, true, false, 100, 50, policy)
+)
+```
 
 ## Repository Layout
 
@@ -294,11 +310,12 @@ Run locally with:
 
 ```sh
 mise exec -- ./gd/tests/test.sh
+mise exec -- bash gd/tests/web_export_test.sh dist/@aviorstudio_gd-playwright.zip
 cd cli && mise exec -- go test ./...
 cd js && mise exec -- bun test
 ```
 
-**Correction ([fieldsofrevik#148](https://github.com/aviorstudio/fieldsofrevik/issues/148)):** this README previously said CI ran all three suites, while the common action omitted `js/index.test.js` and the GD release bypassed the common Godot gate. CI and both release targets now run Go, Godot 4.7.2, and JavaScript tests. The GD path additionally tests the exact closed-manifest ZIP through clean editor enable, restart, disable, restart, smoke, and ownership-cleanup checks before transporting those same bytes to publication.
+**Correction ([fieldsofrevik#148](https://github.com/aviorstudio/fieldsofrevik/issues/148)):** this README previously said CI ran all three suites, while the common action omitted `js/index.test.js` and the GD release bypassed the common Godot gate. CI and both release targets now run Go, Godot 4.7.2, and JavaScript tests. The GD path additionally tests the exact closed-manifest ZIP through clean editor enable, restart, disable, restart, smoke, ownership-cleanup, and ordinary/diagnostic release-export browser checks before transporting those same bytes to publication.
 
 ## License
 
