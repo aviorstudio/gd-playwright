@@ -215,8 +215,10 @@ func _test_payload_policy_differential_corpus_and_single_traversal(failures: Arr
 	var deep: Variant = "leaf"
 	for _index in range(128):
 		deep = [deep]
+	var shared_container := {"id": 7, "stats": {"hp": 9}}
 	var corpus: Array[Dictionary] = [
 		{"name": "valid", "payload": {"route": "battle", "units": [{"id": 1, "stats": {"hp": 7}}]}, "allowed": true},
+		{"name": "shared-container-dag", "payload": {"units": [shared_container, shared_container]}, "allowed": true},
 		{"name": "deep-valid", "payload": {"value": deep}, "allowed": true},
 		{"name": "nested-secret", "payload": {"units": [{"profile": {"refreshToken": "reject"}}]}, "allowed": false},
 		{"name": "non-string-key", "payload": {"units": [{1: "reject"}]}, "allowed": false},
