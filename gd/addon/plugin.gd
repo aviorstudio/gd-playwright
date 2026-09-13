@@ -3,6 +3,8 @@ extends EditorPlugin
 
 const AUTOLOAD_NAME := "PlaywrightService"
 const AUTOLOAD_SCRIPT := "autoload.gd"
+const OWNED_SETTINGS_KEY := "gd_playwright/_owned_settings"
+const OWNS_AUTOLOAD_KEY := "gd_playwright/_owns_autoload"
 const PlaywrightTagNodeScript = preload("src/playwright_tag_node.gd")
 const PlaywrightStatePublisherScript = preload("src/playwright_state_publisher.gd")
 const PlaywrightEventEmitterScript = preload("src/playwright_event_emitter.gd")
@@ -10,24 +12,14 @@ const PlaywrightEventEmitterScript = preload("src/playwright_event_emitter.gd")
 const MENU_SCAN_METADATA := "GD Playwright: Scan Scene For Metadata"
 const MENU_CONVERT_METADATA := "GD Playwright: Convert Metadata To Tags"
 
-var _added_autoload: bool = false
-
 func _enter_tree() -> void:
 	_register_project_settings()
+	_ensure_owned_autoload()
 	add_custom_type("PlaywrightTag", "Node", PlaywrightTagNodeScript, _editor_icon("Tag", "Node"))
 	add_custom_type("PlaywrightStatePublisher", "Node", PlaywrightStatePublisherScript, _editor_icon("Dictionary", "Node"))
 	add_custom_type("PlaywrightEventEmitter", "Node", PlaywrightEventEmitterScript, _editor_icon("Signal", "Node"))
 	add_tool_menu_item(MENU_SCAN_METADATA, Callable(self, "_scan_scene_for_metadata"))
 	add_tool_menu_item(MENU_CONVERT_METADATA, Callable(self, "_convert_metadata_to_tags"))
-
-	var key: String = "autoload/" + AUTOLOAD_NAME
-	if ProjectSettings.has_setting(key):
-		_added_autoload = false
-		return
-
-	var base_dir: String = str(get_script().resource_path).get_base_dir()
-	add_autoload_singleton(AUTOLOAD_NAME, base_dir.path_join(AUTOLOAD_SCRIPT))
-	_added_autoload = true
 
 func _exit_tree() -> void:
 	remove_tool_menu_item(MENU_CONVERT_METADATA)
@@ -35,8 +27,24 @@ func _exit_tree() -> void:
 	remove_custom_type("PlaywrightEventEmitter")
 	remove_custom_type("PlaywrightStatePublisher")
 	remove_custom_type("PlaywrightTag")
-	if _added_autoload:
-		remove_autoload_singleton(AUTOLOAD_NAME)
+
+func _enable_plugin() -> void:
+	_register_project_settings()
+	_ensure_owned_autoload()
+
+func _disable_plugin() -> void:
+	var autoload_key := "autoload/" + AUTOLOAD_NAME
+	if bool(ProjectSettings.get_setting(OWNS_AUTOLOAD_KEY, false)):
+		var configured_path := str(ProjectSettings.get_setting(autoload_key, "")).trim_prefix("*")
+		if configured_path == _autoload_path() or configured_path == _autoload_uid():
+			remove_autoload_singleton(AUTOLOAD_NAME)
+
+	var owned_settings: PackedStringArray = _owned_settings()
+	for setting_name: String in owned_settings:
+		ProjectSettings.set_setting(setting_name, null)
+	ProjectSettings.set_setting(OWNED_SETTINGS_KEY, null)
+	ProjectSettings.set_setting(OWNS_AUTOLOAD_KEY, null)
+	ProjectSettings.save()
 
 func _register_project_settings() -> void:
 	_ensure_setting("gd_playwright/enabled", TYPE_BOOL, false)
@@ -48,11 +56,35 @@ func _register_project_settings() -> void:
 func _ensure_setting(setting_name: String, type: int, default_value: Variant) -> void:
 	if not ProjectSettings.has_setting(setting_name):
 		ProjectSettings.set_setting(setting_name, default_value)
+		var owned_settings: PackedStringArray = _owned_settings()
+		owned_settings.append(setting_name)
+		ProjectSettings.set_setting(OWNED_SETTINGS_KEY, owned_settings)
 	ProjectSettings.set_initial_value(setting_name, default_value)
 	ProjectSettings.add_property_info({
 		"name": setting_name,
 		"type": type
 	})
+
+func _ensure_owned_autoload() -> void:
+	var autoload_key := "autoload/" + AUTOLOAD_NAME
+	if ProjectSettings.has_setting(autoload_key):
+		return
+	add_autoload_singleton(AUTOLOAD_NAME, _autoload_path())
+	ProjectSettings.set_setting(OWNS_AUTOLOAD_KEY, true)
+	ProjectSettings.save()
+
+func _autoload_path() -> String:
+	var base_dir: String = str(get_script().resource_path).get_base_dir()
+	return base_dir.path_join(AUTOLOAD_SCRIPT)
+
+func _autoload_uid() -> String:
+	return FileAccess.get_file_as_string(_autoload_path() + ".uid").strip_edges()
+
+func _owned_settings() -> PackedStringArray:
+	var value: Variant = ProjectSettings.get_setting(OWNED_SETTINGS_KEY, PackedStringArray())
+	if value is PackedStringArray:
+		return value
+	return PackedStringArray()
 
 func _editor_icon(preferred_name: String, fallback_name: String) -> Texture2D:
 	var editor_interface: EditorInterface = get_editor_interface()
@@ -95,7 +127,7 @@ func _get_edited_scene_root() -> Node:
 
 func _scan_metadata_recursive(node: Node) -> Dictionary:
 	var metadata_count: int = 1 if node.has_meta("playwright") else 0
-	var tag_count: int = 1 if node is PlaywrightTagNode else 0
+	var tag_count: int = 1 if _is_playwright_tag(node) else 0
 	for child: Node in node.get_children():
 		var child_result: Dictionary = _scan_metadata_recursive(child)
 		metadata_count += int(child_result.get("metadata", 0))
@@ -108,7 +140,7 @@ func _scan_metadata_recursive(node: Node) -> Dictionary:
 func _convert_metadata_recursive(node: Node, scene_root: Node) -> int:
 	var converted: int = 0
 	if node.has_meta("playwright") and (node is Control or node is Node2D) and not _has_playwright_tag_child(node):
-		var tag: PlaywrightTagNode = PlaywrightTagNodeScript.new()
+		var tag: Node = PlaywrightTagNodeScript.new()
 		tag.name = "PlaywrightTag"
 		tag.tag_key = str(node.get_meta("playwright")).strip_edges()
 		node.add_child(tag)
@@ -121,6 +153,9 @@ func _convert_metadata_recursive(node: Node, scene_root: Node) -> int:
 
 func _has_playwright_tag_child(node: Node) -> bool:
 	for child: Node in node.get_children():
-		if child is PlaywrightTagNode:
+		if _is_playwright_tag(child):
 			return true
 	return false
+
+func _is_playwright_tag(node: Node) -> bool:
+	return node != null and node.get_script() == PlaywrightTagNodeScript

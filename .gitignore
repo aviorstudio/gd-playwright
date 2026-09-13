@@ -1,1 +1,4 @@
 .DS_Store
+.godot/
+__pycache__/
+dist/
