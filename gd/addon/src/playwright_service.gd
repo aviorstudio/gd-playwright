@@ -9,6 +9,95 @@ const ElementMapService = preload("element_map_service.gd")
 const PlaywrightTagNode = preload("playwright_tag_node.gd")
 
 const META_KEY := "playwright"
+const DIAGNOSTICS_EXPORT_FEATURE := "gd_playwright_diagnostics"
+
+## Explicit production diagnostics allowlist. Empty collections deny every
+## game-specific element, event, and state payload in diagnostic release builds.
+class PlaywrightPayloadPolicy extends RefCounted:
+	const SENSITIVE_KEYS := [
+		"access_token", "api_key", "authorization", "cookie", "password",
+		"private_key", "refresh_token", "secret", "session", "token"
+	]
+	var element_keys: PackedStringArray = PackedStringArray()
+	var element_prefixes: PackedStringArray = PackedStringArray()
+	var event_fields: Dictionary = {}
+	var state_fields: Dictionary = {}
+
+	func _init(
+		allowed_element_keys: PackedStringArray = PackedStringArray(),
+		allowed_element_prefixes: PackedStringArray = PackedStringArray(),
+		allowed_event_fields: Dictionary = {},
+		allowed_state_fields: Dictionary = {}
+	) -> void:
+		element_keys = allowed_element_keys.duplicate()
+		element_prefixes = allowed_element_prefixes.duplicate()
+		event_fields = allowed_event_fields.duplicate(true)
+		state_fields = allowed_state_fields.duplicate(true)
+
+	func allows_element(key: String) -> bool:
+		if key in element_keys:
+			return true
+		for prefix: String in element_prefixes:
+			if not prefix.is_empty() and key.begins_with(prefix):
+				return true
+		return false
+
+	func allows_event(event_name: String, payload: Dictionary) -> bool:
+		return _allows_dictionary(event_fields, event_name, payload)
+
+	func allows_state(state_namespace: String, state: Dictionary) -> bool:
+		return _allows_dictionary(state_fields, state_namespace, state)
+
+	func _allows_dictionary(rules: Dictionary, rule_name: String, payload: Dictionary) -> bool:
+		if not rules.has(rule_name) or _contains_sensitive_key(payload):
+			return false
+		var allowed_fields: PackedStringArray = _as_string_array(rules[rule_name])
+		for key: Variant in payload:
+			if str(key) not in allowed_fields or not _is_json_safe(payload[key]):
+				return false
+		return true
+
+	func _contains_sensitive_key(value: Variant) -> bool:
+		if value is Dictionary:
+			for key: Variant in value:
+				if str(key).to_snake_case().to_lower() in SENSITIVE_KEYS:
+					return true
+				if _contains_sensitive_key(value[key]):
+					return true
+		elif value is Array:
+			for item: Variant in value:
+				if _contains_sensitive_key(item):
+					return true
+		return false
+
+	func _is_json_safe(value: Variant) -> bool:
+		if value == null or value is bool or value is String:
+			return true
+		if value is int:
+			return true
+		if value is float:
+			return is_finite(value)
+		if value is Array:
+			for item: Variant in value:
+				if not _is_json_safe(item):
+					return false
+			return true
+		if value is Dictionary:
+			for key: Variant in value:
+				if not (key is String) or not _is_json_safe(value[key]):
+					return false
+			return true
+		return false
+
+	func _as_string_array(value: Variant) -> PackedStringArray:
+		if value is PackedStringArray:
+			return value
+		var result := PackedStringArray()
+		if value is Array:
+			for item: Variant in value:
+				if item is String:
+					result.append(item)
+		return result
 
 ## Runtime configuration for browser event emission behavior.
 class PlaywrightConfig extends RefCounted:
@@ -17,19 +106,22 @@ class PlaywrightConfig extends RefCounted:
 	var log_events: bool = true
 	var buffer_max: int = 1000
 	var buffer_trim: int = 500
+	var payload_policy: PlaywrightPayloadPolicy = null
 
 	func _init(
 		enabled: bool = false,
 		test_mode: bool = false,
 		log_events: bool = true,
 		buffer_max: int = 1000,
-		buffer_trim: int = 500
+		buffer_trim: int = 500,
+		payload_policy: PlaywrightPayloadPolicy = null
 	) -> void:
 		self.enabled = enabled
 		self.test_mode = test_mode
 		self.log_events = log_events
 		self.buffer_max = buffer_max
 		self.buffer_trim = buffer_trim
+		self.payload_policy = payload_policy
 
 const SETTINGS_PREFIX := "gd_playwright/"
 
@@ -45,21 +137,29 @@ const DEFAULT_EVENT_BUFFER_TRIM := 500
 
 var _config: PlaywrightConfig = null
 var _element_map: ElementMapService = null
+var _browser_owner_id: String = ""
 
 func configure(config: PlaywrightConfig) -> void:
 	_config = config if config else _config_from_project_settings()
+	if not _is_web_runtime():
+		return
+	if _should_emit_events():
+		_claim_browser_bridge()
+	else:
+		_cleanup_browser_bridge()
 
 func get_config() -> PlaywrightConfig:
 	return _config
 
 func _ready() -> void:
-	if not OS.has_feature("web"):
+	if not _is_web_runtime():
 		return
 	if not _is_test_mode_enabled():
 		return
 	_on_test_mode_ready()
 
 func _on_test_mode_ready() -> void:
+	_claim_browser_bridge()
 	_element_map = ElementMapService.new()
 	_element_map.setup(self)
 	emit_event("service_ready")
@@ -77,6 +177,8 @@ func get_element_map() -> ElementMapService:
 ## Registers an element position directly without requiring a PlaywrightTag node.
 ## Use this for runtime-created or non-Node2D/Control test targets.
 func register_element(key: String, center: Vector2, element_size: Vector2, visible: bool = true) -> void:
+	if not _allows_element_key(key.strip_edges()):
+		return
 	var element_map_service: ElementMapService = get_element_map()
 	if element_map_service == null:
 		return
@@ -124,9 +226,12 @@ func set_test_state(state_namespace_name: String, state: Dictionary) -> void:
 	var state_namespace: String = state_namespace_name.strip_edges()
 	if state_namespace.is_empty():
 		return
+	if _requires_payload_policy() and not _resolve_payload_policy().allows_state(state_namespace, state):
+		return
 	var json_string: String = JSON.stringify(state)
 	var namespace_json: String = JSON.stringify(state_namespace)
-	JavaScriptBridge.eval("window.godotTestState = window.godotTestState || {}; window.godotTestState[%s] = %s;" % [namespace_json, json_string])
+	_claim_browser_bridge()
+	_browser_eval("window.godotTestState = window.godotTestState || {}; window.godotTestState[%s] = %s;" % [namespace_json, json_string])
 
 ## Clears one window.godotTestState namespace.
 ## No-op when the service is disabled.
@@ -137,7 +242,8 @@ func clear_test_state(state_namespace_name: String) -> void:
 	if state_namespace.is_empty():
 		return
 	var namespace_json: String = JSON.stringify(state_namespace)
-	JavaScriptBridge.eval("if (window.godotTestState) { delete window.godotTestState[%s]; }" % namespace_json)
+	_claim_browser_bridge()
+	_browser_eval("if (window.godotTestState) { delete window.godotTestState[%s]; }" % namespace_json)
 
 ## Called by ElementMapService via deferred call when the map is dirty.
 ## No-op when the service is disabled.
@@ -145,6 +251,7 @@ func _on_element_map_flush_requested() -> void:
 	if not _should_emit_events():
 		return
 	if _element_map != null:
+		_claim_browser_bridge()
 		_element_map.flush_to_browser()
 
 ## Scans the current scene tree for nodes with set_meta("playwright", "key")
@@ -198,6 +305,8 @@ func emit_event(event_name: String, payload: Dictionary = {}) -> void:
 func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 	if not _should_emit_events():
 		return
+	if _requires_payload_policy() and not _resolve_payload_policy().allows_event(event_name, data):
+		return
 
 	var event_data := {
 		"event": event_name,
@@ -209,7 +318,8 @@ func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 
 	var config: PlaywrightConfig = _resolve_config()
 	if config.log_events:
-		JavaScriptBridge.eval("console.log('[GD_PLAYWRIGHT_EVENT]', " + json_string + ")")
+		_claim_browser_bridge()
+		_browser_eval("console.log('[GD_PLAYWRIGHT_EVENT]', " + json_string + ")")
 
 	var buffer_max: int = maxi(config.buffer_max, 0)
 	var buffer_trim: int = maxi(config.buffer_trim, 0)
@@ -229,20 +339,75 @@ func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 		window.godotEvents.push(%s);
 		window.dispatchEvent(new CustomEvent('godot-event', { detail: %s }));
 	""" % [json_string, json_string]
-	JavaScriptBridge.eval(js_code)
+	_claim_browser_bridge()
+	_browser_eval(js_code)
 
 func _should_emit_events() -> bool:
-	if not OS.has_feature("web"):
+	if not _is_web_runtime():
 		return false
 	var config: PlaywrightConfig = _resolve_config()
-
-	if _is_test_mode_enabled():
+	if _is_debug_runtime():
 		return true
+	if not _has_diagnostics_export_feature():
+		return false
+	return _is_test_mode_enabled() or config.enabled
 
-	if config.enabled:
-		return true
+func _exit_tree() -> void:
+	_cleanup_browser_bridge()
 
+func _claim_browser_bridge() -> void:
+	if not _is_web_runtime():
+		return
+	if _browser_owner_id.is_empty():
+		_browser_owner_id = "%s:%s" % [str(get_instance_id()), str(Time.get_ticks_usec())]
+	_browser_eval("window.__gdPlaywrightOwner = %s;" % JSON.stringify(_browser_owner_id))
+
+func _cleanup_browser_bridge() -> void:
+	if not _is_web_runtime() or _browser_owner_id.is_empty():
+		return
+	var owner_json := JSON.stringify(_browser_owner_id)
+	_browser_eval("""
+		if (window.__gdPlaywrightOwner === %s) {
+			var __waiters = window.__gdPlaywrightEventWaiters;
+			if (__waiters instanceof Map) {
+				for (var __waiter of __waiters.values()) {
+					if (__waiter && typeof __waiter.cancel === 'function') { __waiter.cancel(); }
+				}
+			}
+			delete window.__gdPlaywrightEventWaiters;
+			delete window.godotElements;
+			delete window.godotElementsViewport;
+			delete window.godotEvents;
+			delete window.godotTestState;
+			delete window.__gdPlaywrightOwner;
+			window.dispatchEvent(new CustomEvent('gd-playwright-cleanup', { detail: { owner: %s } }));
+		}
+	""" % [owner_json, owner_json])
+	_browser_owner_id = ""
+
+func _browser_eval(code: String) -> Variant:
+	return JavaScriptBridge.eval(code)
+
+func _is_web_runtime() -> bool:
+	return OS.has_feature("web")
+
+func _is_debug_runtime() -> bool:
 	return OS.is_debug_build()
+
+func _has_diagnostics_export_feature() -> bool:
+	return OS.has_feature(DIAGNOSTICS_EXPORT_FEATURE)
+
+func _requires_payload_policy() -> bool:
+	return _is_web_runtime() and not _is_debug_runtime() and _has_diagnostics_export_feature()
+
+func _resolve_payload_policy() -> PlaywrightPayloadPolicy:
+	var config := _resolve_config()
+	if config.payload_policy == null:
+		config.payload_policy = PlaywrightPayloadPolicy.new()
+	return config.payload_policy
+
+func _allows_element_key(key: String) -> bool:
+	return not _requires_payload_policy() or _resolve_payload_policy().allows_element(key)
 
 func _is_test_mode_enabled() -> bool:
 	var config: PlaywrightConfig = _resolve_config()

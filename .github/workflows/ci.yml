@@ -3,7 +3,7 @@ name: CI
 # Every pull request and every merge to main: test, on one runner.
 #
 # The common action runs every shipped suite and verifies the exact assembled GD
-# release ZIP through clean editor enable/restart/disable/restart lifecycle.
+# release ZIP through clean editor lifecycle and ordinary/diagnostic web exports.
 
 on:
   pull_request:
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     # Bounded, so a step that hangs fails here rather than sitting until the
     # runner's own timeout hours later.
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       # Third-party actions are pinned by SHA, with the tag in a trailing
       # comment so the version is still readable. A tag is a moving reference:
