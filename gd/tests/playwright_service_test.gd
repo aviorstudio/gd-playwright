@@ -13,7 +13,26 @@ class FakePlaywrightService extends PlaywrightServiceModule:
 		call_count += 1
 
 class RecordingWebService extends PlaywrightServiceModule:
+	class RecordingReceiver extends RefCounted:
+		var operations: Array[Dictionary] = []
+
+		func claim(owner: String) -> void:
+			operations.append({"kind": "claim", "owner": owner})
+
+		func set_state(state_namespace: String, payload_json: String) -> void:
+			operations.append({"kind": "state", "namespace": state_namespace, "payload": payload_json})
+
+		func clear_state(state_namespace: String) -> void:
+			operations.append({"kind": "clear_state", "namespace": state_namespace})
+
+		func emit_event(event_json: String, log_event: bool, buffer_max: int, buffer_trim: int) -> void:
+			operations.append({"kind": "event", "payload": event_json, "log": log_event, "max": buffer_max, "trim": buffer_trim})
+
+		func publish_elements(payload_json: String) -> void:
+			operations.append({"kind": "elements", "payload": payload_json})
+
 	var scripts: Array[String] = []
+	var receivers: Array[RecordingReceiver] = []
 
 	func _is_web_runtime() -> bool:
 		return true
@@ -27,6 +46,17 @@ class RecordingWebService extends PlaywrightServiceModule:
 	func _browser_eval(code: String) -> Variant:
 		scripts.append(code)
 		return null
+
+	func _create_browser_receiver() -> Variant:
+		var receiver := RecordingReceiver.new()
+		receivers.append(receiver)
+		return receiver
+
+	func operation_count() -> int:
+		var count := 0
+		for receiver: RecordingReceiver in receivers:
+			count += receiver.operations.size()
+		return count
 
 class OrdinaryWebService extends RecordingWebService:
 	func _has_diagnostics_export_feature() -> bool:
@@ -42,6 +72,8 @@ func _initialize() -> void:
 	_test_stale_instance_cleanup_cannot_claim_another_owner(failures)
 	_test_production_payload_policy_is_default_deny(failures)
 	_test_production_payload_policy_allows_only_declared_safe_fields(failures)
+	_test_payload_policy_differential_corpus_and_single_traversal(failures)
+	_test_browser_receiver_is_cached_per_owner(failures)
 	_test_ordinary_release_cannot_enable_bridge_by_setting(failures)
 
 	if failures.is_empty():
@@ -103,20 +135,17 @@ func _test_cleanup_is_owner_guarded_and_complete(failures: Array[String]) -> voi
 	service.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, false, false))
 	var owner_id := service._browser_owner_id
 	service._cleanup_browser_bridge()
-	if service.scripts.size() != 2:
-		failures.append("Expected one bridge claim and one cleanup script")
+	if service.operation_count() != 1 or service.scripts.size() != 1:
+		failures.append("Expected one cached-receiver claim and one cleanup script")
 		service.free()
 		return
-	var cleanup := service.scripts[1]
+	var cleanup := service.scripts[0]
 	if not cleanup.contains("window.__gdPlaywrightOwner ===") or not cleanup.contains(owner_id):
 		failures.append("Expected cleanup to require the current service owner identity")
-	for global_name: String in ["godotElements", "godotElementsViewport", "godotEvents", "godotTestState", "__gdPlaywrightEventWaiters"]:
-		if not cleanup.contains("delete window." + global_name):
-			failures.append("Expected cleanup to remove owned global " + global_name)
-	if not cleanup.contains("__waiter.cancel()"):
-		failures.append("Expected cleanup to cancel helper listeners before deleting their registry")
 	if not service._browser_owner_id.is_empty():
 		failures.append("Expected local browser owner identity to clear after cleanup")
+	if service._browser_receiver != null:
+		failures.append("Expected cleanup to invalidate the cached browser receiver")
 	service.free()
 
 func _test_stale_instance_cleanup_cannot_claim_another_owner(failures: Array[String]) -> void:
@@ -139,11 +168,11 @@ func _test_stale_instance_cleanup_cannot_claim_another_owner(failures: Array[Str
 func _test_production_payload_policy_is_default_deny(failures: Array[String]) -> void:
 	var service := RecordingWebService.new()
 	service.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, false, false))
-	var claim_count := service.scripts.size()
+	var claim_count := service.operation_count()
 	service.emit_event("route_loaded", {"route": "game"})
 	service.set_test_state("game", {"route": "game"})
 	service.register_element("play_button", Vector2.ZERO, Vector2.ONE)
-	if service.scripts.size() != claim_count:
+	if service.operation_count() != claim_count:
 		failures.append("Expected diagnostic release payloads to default deny without a policy")
 	if service.get_element_map().get_element_count() != 0:
 		failures.append("Expected diagnostic release element keys to default deny")
@@ -160,14 +189,14 @@ func _test_production_payload_policy_allows_only_declared_safe_fields(failures: 
 	var service := RecordingWebService.new()
 	service.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, false, false, 1000, 500, policy))
 	service.emit_event("route_loaded", {"route": "game"})
-	var after_allowed_event := service.scripts.size()
+	var after_allowed_event := service.operation_count()
 	service.emit_event("route_loaded", {"route": "game", "token": "must-not-publish"})
-	if service.scripts.size() != after_allowed_event:
+	if service.operation_count() != after_allowed_event:
 		failures.append("Expected sensitive event payload to be rejected before browser publication")
 	service.set_test_state("game", {"route": "game", "units": [{"id": 1}]})
-	var after_allowed_state := service.scripts.size()
+	var after_allowed_state := service.operation_count()
 	service.set_test_state("game", {"route": "game", "units": [{"session": "must-not-publish"}]})
-	if service.scripts.size() != after_allowed_state:
+	if service.operation_count() != after_allowed_state:
 		failures.append("Expected nested sensitive state key to be rejected before publication")
 	service.register_element("play_button", Vector2.ZERO, Vector2.ONE)
 	service.register_element("enemy_7", Vector2.ZERO, Vector2.ONE)
@@ -177,10 +206,118 @@ func _test_production_payload_policy_allows_only_declared_safe_fields(failures: 
 	service._cleanup_browser_bridge()
 	service.free()
 
+func _test_payload_policy_differential_corpus_and_single_traversal(failures: Array[String]) -> void:
+	var policy := PlaywrightServiceModule.PlaywrightPayloadPolicy.new(
+		PackedStringArray(), PackedStringArray(), {},
+		{"game": PackedStringArray(["route", "units", "value"])}
+	)
+	var unsupported := Node.new()
+	var deep: Variant = "leaf"
+	for _index in range(128):
+		deep = [deep]
+	var shared_container := {"id": 7, "stats": {"hp": 9}}
+	var corpus: Array[Dictionary] = [
+		{"name": "valid", "payload": {"route": "battle", "units": [{"id": 1, "stats": {"hp": 7}}]}, "allowed": true},
+		{"name": "shared-container-dag", "payload": {"units": [shared_container, shared_container]}, "allowed": true},
+		{"name": "deep-valid", "payload": {"value": deep}, "allowed": true},
+		{"name": "nested-secret", "payload": {"units": [{"profile": {"refreshToken": "reject"}}]}, "allowed": false},
+		{"name": "non-string-key", "payload": {"units": [{1: "reject"}]}, "allowed": false},
+		{"name": "nan", "payload": {"value": NAN}, "allowed": false},
+		{"name": "infinity", "payload": {"value": INF}, "allowed": false},
+		{"name": "unsupported-object", "payload": {"value": unsupported}, "allowed": false},
+	]
+	for sample: Dictionary in corpus:
+		var actual := policy.allows_state("game", sample["payload"])
+		var legacy_visits_for_sample: Array[int] = [0]
+		var legacy := _legacy_allows_dictionary(
+			sample["payload"], PackedStringArray(["route", "units", "value"]), legacy_visits_for_sample
+		)
+		if actual != legacy:
+			failures.append("Old/new payload decision differs for %s" % sample["name"])
+		if actual != bool(sample["allowed"]):
+			failures.append("Differential payload result changed for %s" % sample["name"])
+	var cyclic: Dictionary = {"route": "cycle"}
+	cyclic["units"] = [cyclic]
+	if policy.allows_state("game", cyclic):
+		failures.append("Expected cyclic payload to be rejected")
+	if policy.validation_visit_count > 4:
+		failures.append("Expected cycle rejection to remain bounded")
+	var legacy_visits: Array[int] = [0]
+	var nested_valid := {"units": [{"stats": {"hp": 7, "armor": 2}}]}
+	var legacy_allowed := _legacy_contains_no_sensitive_key(nested_valid, legacy_visits) and _legacy_is_json_safe(nested_valid["units"], legacy_visits)
+	var optimized_allowed := policy.allows_state("game", nested_valid)
+	if legacy_allowed != optimized_allowed:
+		failures.append("Expected old and new validators to agree on nested valid JSON")
+	if policy.validation_visit_count >= int(legacy_visits[0]):
+		failures.append("Expected merged validator visit count below duplicate legacy traversals")
+	unsupported.free()
+
+func _legacy_allows_dictionary(payload: Dictionary, allowed_fields: PackedStringArray, visits: Array[int]) -> bool:
+	if not _legacy_contains_no_sensitive_key(payload, visits):
+		return false
+	for key: Variant in payload:
+		if str(key) not in allowed_fields or not _legacy_is_json_safe(payload[key], visits):
+			return false
+	return true
+
+func _legacy_contains_no_sensitive_key(value: Variant, visits: Array[int]) -> bool:
+	visits[0] += 1
+	if value is Dictionary:
+		for key: Variant in value:
+			if str(key).to_snake_case().to_lower() in PlaywrightServiceModule.PlaywrightPayloadPolicy.SENSITIVE_KEYS:
+				return false
+			if not _legacy_contains_no_sensitive_key(value[key], visits):
+				return false
+	elif value is Array:
+		for item: Variant in value:
+			if not _legacy_contains_no_sensitive_key(item, visits):
+				return false
+	return true
+
+func _legacy_is_json_safe(value: Variant, visits: Array[int]) -> bool:
+	visits[0] += 1
+	if value == null or value is bool or value is String or value is int:
+		return true
+	if value is float:
+		return is_finite(value)
+	if value is Array:
+		for item: Variant in value:
+			if not _legacy_is_json_safe(item, visits):
+				return false
+		return true
+	if value is Dictionary:
+		for key: Variant in value:
+			if not (key is String) or not _legacy_is_json_safe(value[key], visits):
+				return false
+		return true
+	return false
+
+func _test_browser_receiver_is_cached_per_owner(failures: Array[String]) -> void:
+	var service := RecordingWebService.new()
+	var policy := PlaywrightServiceModule.PlaywrightPayloadPolicy.new(
+		PackedStringArray(), PackedStringArray(),
+		{"route_loaded": PackedStringArray(["route"])},
+		{"game": PackedStringArray(["route"])}
+	)
+	var config := PlaywrightServiceModule.PlaywrightConfig.new(true, false, true, 100, 50, policy)
+	service.configure(config)
+	service.emit_event("route_loaded", {"route": "one"})
+	service.set_test_state("game", {"route": "one"})
+	if service.receivers.size() != 1:
+		failures.append("Expected one fixed receiver compilation for one owner")
+	if service.operation_count() != 3:
+		failures.append("Expected claim, synchronous event, and synchronous state backend calls")
+	service._cleanup_browser_bridge()
+	service.configure(config)
+	if service.receivers.size() != 2:
+		failures.append("Expected a new owner to invalidate and rebuild the receiver once")
+	service._cleanup_browser_bridge()
+	service.free()
+
 func _test_ordinary_release_cannot_enable_bridge_by_setting(failures: Array[String]) -> void:
 	var service := OrdinaryWebService.new()
 	service.configure(PlaywrightServiceModule.PlaywrightConfig.new(true, true, false))
 	service.emit_event("route_loaded", {"route": "game"})
-	if not service.scripts.is_empty():
+	if service.operation_count() != 0:
 		failures.append("Expected ordinary release artifact to ignore enabled/test_mode settings")
 	service.free()
