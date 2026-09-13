@@ -268,6 +268,7 @@ The Godot addon writes generic browser globals during enabled web runs:
 - Debug web builds retain the existing `enabled`/`test_mode` behavior. Ordinary release exports never create gd-playwright browser globals, even when those settings are enabled.
 - Production diagnostics require a separate export preset with the custom feature `gd_playwright_diagnostics`. Configure `PlaywrightConfig` with a `PlaywrightPayloadPolicy`: exact element keys and prefixes, event-name to allowed-field rules, and state-namespace to allowed-field rules. Empty or missing rules deny publication.
 - Diagnostic release payloads must contain only JSON-safe values. Known credential-like keys (including `token`, `password`, `secret`, cookies, session values, API keys, and private keys) are rejected recursively. This is a bounded guard, not a confidentiality or exhaustive secret-detection guarantee; games remain responsible for publishing only non-sensitive diagnostic data.
+- Validation walks each accepted payload once, and enabled browser publication reuses one fixed receiver per owner. These are internal safeguards only: publication remains synchronous, events retain order/detail, and element updates still replace the full map at the existing cadence.
 - Calls are safe to leave in game code because disabled features no-op.
 - Do not expose private player data through test state or event payloads.
 - Game-specific knowledge belongs in game docs or skills, not in `gdpw`.

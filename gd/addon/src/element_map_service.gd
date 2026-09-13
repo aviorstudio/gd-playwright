@@ -137,19 +137,15 @@ func flush_to_browser() -> void:
 		"viewport_height": int(viewport_size.y)
 	}
 	var json_string: String = JSON.stringify(payload)
-	var js_code: String = """
-		var __payload = %s;
-		window.godotElements = __payload.elements;
-		window.godotElementsViewport = {
-			width: __payload.viewport_width,
-			height: __payload.viewport_height
-		};
-		window.dispatchEvent(new CustomEvent('godot-elements-updated', { detail: __payload }));
-	""" % json_string
-	if _owner != null and _owner.has_method("_browser_eval"):
-		_owner.call("_browser_eval", js_code)
+	if _owner != null and _owner.has_method("_publish_element_map"):
+		_owner.call("_publish_element_map", json_string)
 	else:
-		JavaScriptBridge.eval(js_code)
+		JavaScriptBridge.eval("""
+			var __payload = %s;
+			window.godotElements = __payload.elements;
+			window.godotElementsViewport = { width: __payload.viewport_width, height: __payload.viewport_height };
+			window.dispatchEvent(new CustomEvent('godot-elements-updated', { detail: __payload }));
+		""" % json_string)
 
 ## Clears all registered elements.
 func clear() -> void:

@@ -22,6 +22,7 @@ class PlaywrightPayloadPolicy extends RefCounted:
 	var element_prefixes: PackedStringArray = PackedStringArray()
 	var event_fields: Dictionary = {}
 	var state_fields: Dictionary = {}
+	var validation_visit_count: int = 0
 
 	func _init(
 		allowed_element_keys: PackedStringArray = PackedStringArray(),
@@ -49,45 +50,50 @@ class PlaywrightPayloadPolicy extends RefCounted:
 		return _allows_dictionary(state_fields, state_namespace, state)
 
 	func _allows_dictionary(rules: Dictionary, rule_name: String, payload: Dictionary) -> bool:
-		if not rules.has(rule_name) or _contains_sensitive_key(payload):
+		if not rules.has(rule_name):
 			return false
 		var allowed_fields: PackedStringArray = _as_string_array(rules[rule_name])
 		for key: Variant in payload:
-			if str(key) not in allowed_fields or not _is_json_safe(payload[key]):
+			if not (key is String) or str(key) not in allowed_fields:
 				return false
+		return _is_safe_json_payload(payload)
+
+	## Validates JSON compatibility and sensitive keys in one iterative walk.
+	## Active-container tracking rejects cycles without imposing a depth limit on
+	## finite JSON payloads.
+	func _is_safe_json_payload(root: Variant) -> bool:
+		validation_visit_count = 0
+		var stack: Array[Dictionary] = [{"value": root, "leaving": false}]
+		var active_containers: Array[Variant] = []
+		while not stack.is_empty():
+			var frame: Dictionary = stack.pop_back()
+			if bool(frame["leaving"]):
+				active_containers.pop_back()
+				continue
+			var value: Variant = frame["value"]
+			validation_visit_count += 1
+			if value == null or value is bool or value is String or value is int:
+				continue
+			if value is float:
+				if not is_finite(value):
+					return false
+				continue
+			if not (value is Array or value is Dictionary):
+				return false
+			for active: Variant in active_containers:
+				if is_same(value, active):
+					return false
+			active_containers.append(value)
+			stack.append({"value": null, "leaving": true})
+			if value is Dictionary:
+				for key: Variant in value:
+					if not (key is String) or str(key).to_snake_case().to_lower() in SENSITIVE_KEYS:
+						return false
+					stack.append({"value": value[key], "leaving": false})
+			else:
+				for item: Variant in value:
+					stack.append({"value": item, "leaving": false})
 		return true
-
-	func _contains_sensitive_key(value: Variant) -> bool:
-		if value is Dictionary:
-			for key: Variant in value:
-				if str(key).to_snake_case().to_lower() in SENSITIVE_KEYS:
-					return true
-				if _contains_sensitive_key(value[key]):
-					return true
-		elif value is Array:
-			for item: Variant in value:
-				if _contains_sensitive_key(item):
-					return true
-		return false
-
-	func _is_json_safe(value: Variant) -> bool:
-		if value == null or value is bool or value is String:
-			return true
-		if value is int:
-			return true
-		if value is float:
-			return is_finite(value)
-		if value is Array:
-			for item: Variant in value:
-				if not _is_json_safe(item):
-					return false
-			return true
-		if value is Dictionary:
-			for key: Variant in value:
-				if not (key is String) or not _is_json_safe(value[key]):
-					return false
-			return true
-		return false
 
 	func _as_string_array(value: Variant) -> PackedStringArray:
 		if value is PackedStringArray:
@@ -123,6 +129,64 @@ class PlaywrightConfig extends RefCounted:
 		self.buffer_trim = buffer_trim
 		self.payload_policy = payload_policy
 
+## Cached bridge interfaces used by one service owner. Dynamic data is parsed
+## as JSON, while the publication path itself does not compile JavaScript.
+class BrowserReceiver extends RefCounted:
+	var _window: JavaScriptObject
+	var _json: JavaScriptObject
+	var _console: JavaScriptObject
+	var _owner: String
+
+	func _init(owner: String) -> void:
+		_owner = owner
+		_window = JavaScriptBridge.get_interface("window")
+		_json = JavaScriptBridge.get_interface("JSON")
+		_console = JavaScriptBridge.get_interface("console")
+
+	func claim(owner: String) -> void:
+		_window["__gdPlaywrightOwner"] = owner
+
+	func set_state(state_namespace: String, payload_json: String) -> void:
+		_restore_owner()
+		if _window["godotTestState"] == null:
+			_window["godotTestState"] = JavaScriptBridge.create_object("Object")
+		_window["godotTestState"][state_namespace] = _json.parse(payload_json)
+
+	func clear_state(state_namespace: String) -> void:
+		_restore_owner()
+		if _window["godotTestState"] != null:
+			JavaScriptBridge.get_interface("Reflect").deleteProperty(_window["godotTestState"], state_namespace)
+
+	func emit_event(event_json: String, log_event: bool, buffer_max: int, buffer_trim: int) -> void:
+		_restore_owner()
+		var event_data: JavaScriptObject = _json.parse(event_json)
+		if log_event:
+			_console.log("[GD_PLAYWRIGHT_EVENT]", event_data)
+		if buffer_max > 0 and buffer_trim > 0 and _window["godotEvents"] != null and int(_window["godotEvents"].length) >= buffer_max:
+			_window["godotEvents"] = _window["godotEvents"].slice(-buffer_trim)
+		if _window["godotEvents"] == null:
+			_window["godotEvents"] = JavaScriptBridge.create_object("Array")
+		_window["godotEvents"].push(event_data)
+		_dispatch("godot-event", event_data)
+
+	func publish_elements(payload_json: String) -> void:
+		_restore_owner()
+		var payload: JavaScriptObject = _json.parse(payload_json)
+		_window["godotElements"] = payload.elements
+		var viewport: JavaScriptObject = JavaScriptBridge.create_object("Object")
+		viewport.width = payload.viewport_width
+		viewport.height = payload.viewport_height
+		_window["godotElementsViewport"] = viewport
+		_dispatch("godot-elements-updated", payload)
+
+	func _dispatch(event_name: String, detail: JavaScriptObject) -> void:
+		var options: JavaScriptObject = JavaScriptBridge.create_object("Object")
+		options.detail = detail
+		_window.dispatchEvent(JavaScriptBridge.create_object("CustomEvent", event_name, options))
+
+	func _restore_owner() -> void:
+		_window["__gdPlaywrightOwner"] = _owner
+
 const SETTINGS_PREFIX := "gd_playwright/"
 
 const SETTING_ENABLED := SETTINGS_PREFIX + "enabled"
@@ -138,6 +202,7 @@ const DEFAULT_EVENT_BUFFER_TRIM := 500
 var _config: PlaywrightConfig = null
 var _element_map: ElementMapService = null
 var _browser_owner_id: String = ""
+var _browser_receiver: Variant = null
 
 func configure(config: PlaywrightConfig) -> void:
 	_config = config if config else _config_from_project_settings()
@@ -228,10 +293,8 @@ func set_test_state(state_namespace_name: String, state: Dictionary) -> void:
 		return
 	if _requires_payload_policy() and not _resolve_payload_policy().allows_state(state_namespace, state):
 		return
-	var json_string: String = JSON.stringify(state)
-	var namespace_json: String = JSON.stringify(state_namespace)
 	_claim_browser_bridge()
-	_browser_eval("window.godotTestState = window.godotTestState || {}; window.godotTestState[%s] = %s;" % [namespace_json, json_string])
+	_get_browser_receiver().set_state(state_namespace, JSON.stringify(state))
 
 ## Clears one window.godotTestState namespace.
 ## No-op when the service is disabled.
@@ -241,9 +304,8 @@ func clear_test_state(state_namespace_name: String) -> void:
 	var state_namespace: String = state_namespace_name.strip_edges()
 	if state_namespace.is_empty():
 		return
-	var namespace_json: String = JSON.stringify(state_namespace)
 	_claim_browser_bridge()
-	_browser_eval("if (window.godotTestState) { delete window.godotTestState[%s]; }" % namespace_json)
+	_get_browser_receiver().clear_state(state_namespace)
 
 ## Called by ElementMapService via deferred call when the map is dirty.
 ## No-op when the service is disabled.
@@ -314,33 +376,11 @@ func emit_event_to_browser(event_name: String, data: Dictionary = {}) -> void:
 		"data": data
 	}
 
-	var json_string := JSON.stringify(event_data)
-
 	var config: PlaywrightConfig = _resolve_config()
-	if config.log_events:
-		_claim_browser_bridge()
-		_browser_eval("console.log('[GD_PLAYWRIGHT_EVENT]', " + json_string + ")")
-
 	var buffer_max: int = maxi(config.buffer_max, 0)
 	var buffer_trim: int = maxi(config.buffer_trim, 0)
-
-	var js_code := ""
-	if buffer_max > 0 and buffer_trim > 0:
-		js_code += """
-			if (window.godotEvents && window.godotEvents.length >= %d) {
-				window.godotEvents = window.godotEvents.slice(-%d);
-			}
-		""" % [buffer_max, buffer_trim]
-
-	js_code += """
-		if (!window.godotEvents) {
-			window.godotEvents = [];
-		}
-		window.godotEvents.push(%s);
-		window.dispatchEvent(new CustomEvent('godot-event', { detail: %s }));
-	""" % [json_string, json_string]
 	_claim_browser_bridge()
-	_browser_eval(js_code)
+	_get_browser_receiver().emit_event(JSON.stringify(event_data), config.log_events, buffer_max, buffer_trim)
 
 func _should_emit_events() -> bool:
 	if not _is_web_runtime():
@@ -359,8 +399,9 @@ func _claim_browser_bridge() -> void:
 	if not _is_web_runtime():
 		return
 	if _browser_owner_id.is_empty():
+		_browser_receiver = null
 		_browser_owner_id = "%s:%s" % [str(get_instance_id()), str(Time.get_ticks_usec())]
-	_browser_eval("window.__gdPlaywrightOwner = %s;" % JSON.stringify(_browser_owner_id))
+		_get_browser_receiver().claim(_browser_owner_id)
 
 func _cleanup_browser_bridge() -> void:
 	if not _is_web_runtime() or _browser_owner_id.is_empty():
@@ -384,6 +425,18 @@ func _cleanup_browser_bridge() -> void:
 		}
 	""" % [owner_json, owner_json])
 	_browser_owner_id = ""
+	_browser_receiver = null
+
+func _publish_element_map(payload_json: String) -> void:
+	_get_browser_receiver().publish_elements(payload_json)
+
+func _get_browser_receiver() -> Variant:
+	if _browser_receiver == null:
+		_browser_receiver = _create_browser_receiver()
+	return _browser_receiver
+
+func _create_browser_receiver() -> Variant:
+	return BrowserReceiver.new(_browser_owner_id)
 
 func _browser_eval(code: String) -> Variant:
 	return JavaScriptBridge.eval(code)
