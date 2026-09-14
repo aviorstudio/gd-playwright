@@ -62,6 +62,14 @@ class OrdinaryWebService extends RecordingWebService:
 	func _has_diagnostics_export_feature() -> bool:
 		return false
 
+class PrimitiveFrameMutationPolicy extends PlaywrightServiceModule.PlaywrightPayloadPolicy:
+	func _uses_primitive_leaf_fast_path() -> bool:
+		return false
+
+class KeyCacheMutationPolicy extends PlaywrightServiceModule.PlaywrightPayloadPolicy:
+	func _uses_key_classification_cache() -> bool:
+		return false
+
 func _initialize() -> void:
 	var failures: Array[String] = []
 	_test_emit_event_delegates_to_browser_emitter(failures)
@@ -73,6 +81,7 @@ func _initialize() -> void:
 	_test_production_payload_policy_is_default_deny(failures)
 	_test_production_payload_policy_allows_only_declared_safe_fields(failures)
 	_test_payload_policy_differential_corpus_and_single_traversal(failures)
+	_test_payload_policy_work_controls(failures)
 	_test_browser_receiver_is_cached_per_owner(failures)
 	_test_ordinary_release_cannot_enable_bridge_by_setting(failures)
 
@@ -251,6 +260,26 @@ func _test_payload_policy_differential_corpus_and_single_traversal(failures: Arr
 	if policy.validation_visit_count >= int(legacy_visits[0]):
 		failures.append("Expected merged validator visit count below duplicate legacy traversals")
 	unsupported.free()
+
+func _test_payload_policy_work_controls(failures: Array[String]) -> void:
+	var allowed := {"game": PackedStringArray(["units"])}
+	var payload := {"units": [{"unitId": 1, "stats": {"unitId": 2}}, {"unitId": 3}]}
+	var policy := PlaywrightServiceModule.PlaywrightPayloadPolicy.new(PackedStringArray(), PackedStringArray(), {}, allowed)
+	var primitive_mutation := PrimitiveFrameMutationPolicy.new(PackedStringArray(), PackedStringArray(), {}, allowed)
+	var cache_mutation := KeyCacheMutationPolicy.new(PackedStringArray(), PackedStringArray(), {}, allowed)
+	if not policy.allows_state("game", payload) or not primitive_mutation.allows_state("game", payload) or not cache_mutation.allows_state("game", payload):
+		failures.append("Expected work-control policies to retain the accepted payload decision")
+	if policy.validation_visit_count != primitive_mutation.validation_visit_count:
+		failures.append("Expected primitive fast path to retain public completed-call visit count")
+	if policy._validation_value_frame_count >= primitive_mutation._validation_value_frame_count:
+		failures.append("Expected disabling primitive fast path to fail the value-frame work invariant")
+	if policy._validation_key_normalization_count >= cache_mutation._validation_key_normalization_count:
+		failures.append("Expected disabling publication-local key cache to fail the normalization work invariant")
+	var sensitive := {"units": [{"refreshToken": "reject"}]}
+	if policy.allows_state("game", sensitive):
+		failures.append("Expected normalized sensitive key to remain rejected")
+	if policy.validation_visit_count != 3:
+		failures.append("Expected early rejection to publish one completed-call visit count")
 
 func _legacy_allows_dictionary(payload: Dictionary, allowed_fields: PackedStringArray, visits: Array[int]) -> bool:
 	if not _legacy_contains_no_sensitive_key(payload, visits):

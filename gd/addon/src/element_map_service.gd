@@ -42,6 +42,9 @@ var _elements: Dictionary[String, ElementEntry] = {}
 var _dirty: bool = false
 var _flush_scheduled: bool = false
 var _owner: Node = null
+var _wire_entries: Dictionary[String, ElementEntry] = {}
+var _wire_views: Dictionary[String, Dictionary] = {}
+var _wire_materialization_count: int = 0
 
 ## Binds to an owner node for deferred flush scheduling.
 func setup(owner: Node) -> void:
@@ -69,6 +72,8 @@ func unregister(key: String) -> void:
 	if not _elements.has(key):
 		return
 	_elements.erase(key)
+	_wire_entries.erase(key)
+	_wire_views.erase(key)
 	_mark_dirty()
 
 ## Updates the position and visibility of an existing element.
@@ -121,12 +126,22 @@ func is_dirty() -> bool:
 func flush_to_browser() -> void:
 	_flush_scheduled = false
 	_dirty = false
-	if not OS.has_feature("web"):
+	if not _is_web_runtime():
 		return
 	var elements_dict: Dictionary[String, Variant] = {}
 	for key: String in _elements:
 		var entry: ElementEntry = _elements[key]
-		elements_dict[key] = entry.to_dict()
+		var wire_view: Dictionary = _wire_views.get(key, {})
+		if _wire_entries.get(key) != entry or not _can_reuse_wire_view(wire_view, entry):
+			wire_view = entry.to_dict()
+			_wire_materialization_count += 1
+			_wire_entries[key] = entry
+			_wire_views[key] = wire_view
+		elements_dict[key] = wire_view
+	for cached_key: String in _wire_views.keys():
+		if not _elements.has(cached_key):
+			_wire_views.erase(cached_key)
+			_wire_entries.erase(cached_key)
 	var viewport_size: Vector2 = Vector2.ZERO
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree and tree.root:
@@ -137,6 +152,23 @@ func flush_to_browser() -> void:
 		"viewport_height": int(viewport_size.y)
 	}
 	var json_string: String = JSON.stringify(payload)
+	_publish_payload_json(json_string)
+
+func _wire_view_matches_entry(wire_view: Dictionary, entry: ElementEntry) -> bool:
+	return wire_view.size() == 5 \
+		and wire_view.get("x") == entry.center_x \
+		and wire_view.get("y") == entry.center_y \
+		and wire_view.get("w") == entry.width \
+		and wire_view.get("h") == entry.height \
+		and wire_view.get("visible") == entry.visible
+
+func _can_reuse_wire_view(wire_view: Dictionary, entry: ElementEntry) -> bool:
+	return _wire_view_matches_entry(wire_view, entry)
+
+func _is_web_runtime() -> bool:
+	return OS.has_feature("web")
+
+func _publish_payload_json(json_string: String) -> void:
 	if _owner != null and _owner.has_method("_publish_element_map"):
 		_owner.call("_publish_element_map", json_string)
 	else:
@@ -150,6 +182,8 @@ func flush_to_browser() -> void:
 ## Clears all registered elements.
 func clear() -> void:
 	_elements.clear()
+	_wire_entries.clear()
+	_wire_views.clear()
 	_mark_dirty()
 
 func _mark_dirty() -> void:

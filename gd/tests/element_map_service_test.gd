@@ -7,6 +7,19 @@ class EnabledPlaywrightService extends PlaywrightServiceModule:
 	func _should_emit_events() -> bool:
 		return true
 
+class RecordingElementMapService extends ElementMapService:
+	var payloads: Array[String] = []
+
+	func _is_web_runtime() -> bool:
+		return true
+
+	func _publish_payload_json(json_string: String) -> void:
+		payloads.append(json_string)
+
+class WireCacheMutationService extends RecordingElementMapService:
+	func _can_reuse_wire_view(_wire_view: Dictionary, _entry: ElementEntry) -> bool:
+		return false
+
 func _initialize() -> void:
 	var failures: Array[String] = []
 	_test_register_and_lookup(failures)
@@ -16,6 +29,7 @@ func _initialize() -> void:
 	_test_empty_key_rejected(failures)
 	_test_get_all_keys(failures)
 	_test_service_register_element_api(failures)
+	_test_cached_wire_views_preserve_public_mutation_semantics(failures)
 
 	if failures.is_empty():
 		print("PASS gd-playwright element_map_service_test")
@@ -156,3 +170,40 @@ func _test_service_register_element_api(failures: Array[String]) -> void:
 	if element_map != null and element_map.get_element_count() != 0:
 		failures.append("Expected clear_elements to remove all keys")
 	service.free()
+
+func _test_cached_wire_views_preserve_public_mutation_semantics(failures: Array[String]) -> void:
+	var service := RecordingElementMapService.new()
+	service.register("outer", Vector2(1, 2), Vector2(3, 4), true)
+	var original: ElementMapService.ElementEntry = service.get_entry("outer")
+	var first_copy := original.to_dict()
+	service.flush_to_browser()
+	var first_json := service.payloads[-1]
+	var first_wire: Dictionary = service._wire_views["outer"]
+	service.flush_to_browser()
+	if not is_same(service._wire_views["outer"], first_wire) or service._wire_materialization_count != 1:
+		failures.append("Expected unchanged entry to reuse its internal wire view")
+	var cache_mutation := WireCacheMutationService.new()
+	cache_mutation.register("outer", Vector2(1, 2), Vector2(3, 4), true)
+	cache_mutation.flush_to_browser()
+	cache_mutation.flush_to_browser()
+	if cache_mutation._wire_materialization_count <= service._wire_materialization_count:
+		failures.append("Expected disabling wire-view reuse to fail the materialization work invariant")
+	original.center_x = 9
+	original.key = "inner-does-not-replace-outer"
+	service.flush_to_browser()
+	var mutated_payload: Dictionary = JSON.parse_string(service.payloads[-1])
+	if int(mutated_payload["elements"]["outer"]["x"]) != 9 or mutated_payload["elements"].has(original.key):
+		failures.append("Expected direct entry mutation on the existing outer map key in the next explicit flush")
+	if int(first_copy["x"]) != 1 or first_json != service.payloads[0]:
+		failures.append("Expected fresh to_dict copies and retained published JSON snapshots to remain independent")
+	var replacement := ElementMapService.ElementEntry.new("different-inner", 11, 12, 13, 14, false)
+	service.get_all_entries()["outer"] = replacement
+	service.flush_to_browser()
+	var replacement_payload: Dictionary = JSON.parse_string(service.payloads[-1])
+	if int(replacement_payload["elements"]["outer"]["x"]) != 11 or bool(replacement_payload["elements"]["outer"]["visible"]):
+		failures.append("Expected direct replacement to refresh the outer-key wire view")
+	service.get_all_entries().erase("outer")
+	service.flush_to_browser()
+	var removed_payload: Dictionary = JSON.parse_string(service.payloads[-1])
+	if removed_payload["elements"].has("outer") or service._wire_views.has("outer") or service._wire_entries.has("outer"):
+		failures.append("Expected direct removal to publish and evict bounded internal cache state")
