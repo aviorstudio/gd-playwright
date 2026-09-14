@@ -23,6 +23,8 @@ class PlaywrightPayloadPolicy extends RefCounted:
 	var event_fields: Dictionary = {}
 	var state_fields: Dictionary = {}
 	var validation_visit_count: int = 0
+	var _validation_value_frame_count: int = 0
+	var _validation_key_normalization_count: int = 0
 
 	func _init(
 		allowed_element_keys: PackedStringArray = PackedStringArray(),
@@ -62,38 +64,85 @@ class PlaywrightPayloadPolicy extends RefCounted:
 	## Active-container tracking rejects cycles without imposing a depth limit on
 	## finite JSON payloads.
 	func _is_safe_json_payload(root: Variant) -> bool:
-		validation_visit_count = 0
-		var stack: Array[Dictionary] = [{"value": root, "leaving": false}]
+		var visit_count: int = 0
+		var value_frame_count: int = 1
+		var key_normalization_count: int = 0
+		var key_classification_cache: Dictionary[String, bool] = {}
+		var stack: Array[Variant] = [root]
+		var leaving_stack := PackedByteArray([0])
 		var active_containers: Array[Variant] = []
 		while not stack.is_empty():
-			var frame: Dictionary = stack.pop_back()
-			if bool(frame["leaving"]):
+			var value: Variant = stack.pop_back()
+			var leaving: bool = bool(leaving_stack[-1])
+			leaving_stack.resize(leaving_stack.size() - 1)
+			if leaving:
 				active_containers.pop_back()
 				continue
-			var value: Variant = frame["value"]
-			validation_visit_count += 1
+			visit_count += 1
 			if value == null or value is bool or value is String or value is int:
 				continue
 			if value is float:
 				if not is_finite(value):
-					return false
+					return _finish_validation(false, visit_count, value_frame_count, key_normalization_count)
 				continue
 			if not (value is Array or value is Dictionary):
-				return false
+				return _finish_validation(false, visit_count, value_frame_count, key_normalization_count)
 			for active: Variant in active_containers:
 				if is_same(value, active):
-					return false
+					return _finish_validation(false, visit_count, value_frame_count, key_normalization_count)
 			active_containers.append(value)
-			stack.append({"value": null, "leaving": true})
+			stack.append(value)
+			leaving_stack.append(1)
 			if value is Dictionary:
 				for key: Variant in value:
-					if not (key is String) or str(key).to_snake_case().to_lower() in SENSITIVE_KEYS:
-						return false
-					stack.append({"value": value[key], "leaving": false})
+					if not (key is String):
+						return _finish_validation(false, visit_count, value_frame_count, key_normalization_count)
+					var key_string: String = key
+					var is_sensitive: bool
+					if _uses_key_classification_cache() and key_classification_cache.has(key_string):
+						is_sensitive = key_classification_cache[key_string]
+					else:
+						is_sensitive = key_string.to_snake_case().to_lower() in SENSITIVE_KEYS
+						key_normalization_count += 1
+						if _uses_key_classification_cache():
+							key_classification_cache[key_string] = is_sensitive
+					if is_sensitive:
+						return _finish_validation(false, visit_count, value_frame_count, key_normalization_count)
+					var child: Variant = value[key]
+					if _uses_primitive_leaf_fast_path() and _is_json_primitive(child):
+						visit_count += 1
+						if child is float and not is_finite(child):
+							return _finish_validation(false, visit_count, value_frame_count, key_normalization_count)
+					else:
+						stack.append(child)
+						leaving_stack.append(0)
+						value_frame_count += 1
 			else:
 				for item: Variant in value:
-					stack.append({"value": item, "leaving": false})
+					if _uses_primitive_leaf_fast_path() and _is_json_primitive(item):
+						visit_count += 1
+						if item is float and not is_finite(item):
+							return _finish_validation(false, visit_count, value_frame_count, key_normalization_count)
+					else:
+						stack.append(item)
+						leaving_stack.append(0)
+						value_frame_count += 1
+		return _finish_validation(true, visit_count, value_frame_count, key_normalization_count)
+
+	func _is_json_primitive(value: Variant) -> bool:
+		return value == null or value is bool or value is String or value is int or value is float
+
+	func _uses_primitive_leaf_fast_path() -> bool:
 		return true
+
+	func _uses_key_classification_cache() -> bool:
+		return true
+
+	func _finish_validation(result: bool, visits: int, value_frames: int, normalizations: int) -> bool:
+		validation_visit_count = visits
+		_validation_value_frame_count = value_frames
+		_validation_key_normalization_count = normalizations
+		return result
 
 	func _as_string_array(value: Variant) -> PackedStringArray:
 		if value is PackedStringArray:
