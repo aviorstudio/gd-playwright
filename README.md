@@ -1,3 +1,5 @@
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 2bf80e73e0c563709555044ab469a2a8dd41aad5098e45b927e345e8b089781a -->
+
 # gd-playwright
 
 Playwright tooling for Godot web exports.
@@ -287,37 +289,7 @@ PlaywrightService.configure(
 )
 ```
 
-## Repository Layout
-
-- `gd/addon/`: Godot plugin source packaged for GDAM and manual installation.
-- `gd/tests/`: Godot test project/scripts for addon behavior.
-- `cli/`: Go `gdpw` CLI source and build scripts.
-- `js/`: JavaScript Playwright helpers and tests.
-- `.github/workflows/ci.yml`: runs the Go, Godot, and JavaScript suites plus package controls.
-- `.github/workflows/release.yml`: creates addon and CLI GitHub releases.
-
-## Versioning And Releases
-
-This repo currently has two automated release targets:
-
-- `gd`: uses `gd-v*` tags, verifies `gd/addon/plugin.cfg`, builds `@aviorstudio_gd-playwright.zip`, and publishes `@aviorstudio/gd-playwright` to GDAM.
-- `cli`: uses `cli-v*` tags, runs Go tests, builds `gdpw` binaries for Linux, macOS, and Windows, and attaches checksums.
-
-The implemented `js/` package does not yet have an automated release target. The release workflow is manual and must be run from `main` with a `patch`, `minor`, or `major` bump.
-
-## Testing
-
-Run locally with:
-
-```sh
-mise exec -- ./gd/tests/test.sh
-mise exec -- bash gd/tests/web_export_test.sh dist/@aviorstudio_gd-playwright.zip
-cd cli && mise exec -- go test ./...
-cd js && mise exec -- bun test
-```
-
-**Correction ([fieldsofrevik#148](https://github.com/aviorstudio/fieldsofrevik/issues/148)):** this README previously said CI ran all three suites, while the common action omitted `js/index.test.js` and the GD release bypassed the common Godot gate. CI and both release targets now run Go, Godot 4.7.2, and JavaScript tests. The GD path additionally tests the exact closed-manifest ZIP through clean editor enable, restart, disable, restart, smoke, ownership-cleanup, and ordinary/diagnostic release-export browser checks before transporting those same bytes to publication.
 
 ## License
 
-MIT
+See `LICENSE`.
