@@ -20,7 +20,7 @@ jobs:
   gate:
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 30
     outputs:
       tag: ${{ steps.release.outputs.tag }}
@@ -130,7 +130,7 @@ jobs:
     needs: gate
     permissions:
       contents: write
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
