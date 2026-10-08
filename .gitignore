@@ -2,3 +2,6 @@
 .godot/
 __pycache__/
 dist/
+
+.artifacts/
+.playwright-cli/
