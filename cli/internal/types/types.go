@@ -40,8 +40,8 @@ type ElementQuery struct {
 
 // StatusInfo is the result of a status check.
 type StatusInfo struct {
-	Connected     bool `json:"connected"`
-	ElementCount  int  `json:"element_count"`
-	EventCount    int  `json:"event_count"`
-	HasViewport   bool `json:"has_viewport"`
+	Connected    bool `json:"connected"`
+	ElementCount int  `json:"element_count"`
+	EventCount   int  `json:"event_count"`
+	HasViewport  bool `json:"has_viewport"`
 }
