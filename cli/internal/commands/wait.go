@@ -14,10 +14,10 @@ import (
 // NewWaitCmd creates the "wait" command.
 func NewWaitCmd(connect func() (*cdp.Client, error)) *cobra.Command {
 	var (
-		timeout    int
+		timeout     int
 		includePast bool
-		since      int64
-		filters    []string
+		since       int64
+		filters     []string
 	)
 
 	cmd := &cobra.Command{
