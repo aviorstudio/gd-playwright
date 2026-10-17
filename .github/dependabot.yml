@@ -5,7 +5,7 @@ updates:
   schedule:
     interval: weekly
     day: monday
-    time: 09:20
+    time: "09:20"
     timezone: Etc/UTC
   groups:
     routine-updates:
@@ -75,7 +75,7 @@ updates:
   schedule:
     interval: weekly
     day: monday
-    time: 09:20
+    time: "09:20"
     timezone: Etc/UTC
   open-pull-requests-limit: 5
   cooldown:
