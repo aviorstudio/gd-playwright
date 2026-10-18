@@ -31,6 +31,10 @@ updates:
       - '*drizzle*'
       - '*migrate*'
       - '@playwright/cli'
+      - modernc.org/sqlite
+      - github.com/jackc/pgx/*
+      - github.com/go-sql-driver/mysql
+      - go.mongodb.org/mongo-driver/*
       update-types:
       - minor
       - patch
@@ -66,6 +70,10 @@ updates:
       - '*prisma*'
       - '*drizzle*'
       - '*migrate*'
+      - modernc.org/sqlite
+      - github.com/jackc/pgx/*
+      - github.com/go-sql-driver/mysql
+      - go.mongodb.org/mongo-driver/*
   open-pull-requests-limit: 5
   cooldown:
     default-days: 3
@@ -104,6 +112,10 @@ updates:
       - '*drizzle*'
       - '*migrate*'
       - '@playwright/cli'
+      - modernc.org/sqlite
+      - github.com/jackc/pgx/*
+      - github.com/go-sql-driver/mysql
+      - go.mongodb.org/mongo-driver/*
       update-types:
       - minor
       - patch
@@ -139,3 +151,7 @@ updates:
       - '*prisma*'
       - '*drizzle*'
       - '*migrate*'
+      - modernc.org/sqlite
+      - github.com/jackc/pgx/*
+      - github.com/go-sql-driver/mysql
+      - go.mongodb.org/mongo-driver/*
