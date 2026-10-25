@@ -21,7 +21,7 @@ jobs:
     name: "Verify release"
     permissions:
       contents: read
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
       tag: ${{ steps.release.outputs.tag }}
@@ -130,7 +130,7 @@ jobs:
     needs: gate
     permissions:
       contents: write
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: "Download artifacts"
