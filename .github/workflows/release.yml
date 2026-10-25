@@ -21,7 +21,7 @@ jobs:
     name: "Verify release"
     permissions:
       contents: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     outputs:
       tag: ${{ steps.release.outputs.tag }}
