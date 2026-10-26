@@ -9,8 +9,8 @@ const PlaywrightTagNodeScript = preload("src/playwright_tag_node.gd")
 const PlaywrightStatePublisherScript = preload("src/playwright_state_publisher.gd")
 const PlaywrightEventEmitterScript = preload("src/playwright_event_emitter.gd")
 
-const MENU_SCAN_METADATA := "GD Playwright: Scan Scene For Metadata"
-const MENU_CONVERT_METADATA := "GD Playwright: Convert Metadata To Tags"
+const MENU_SCAN_METADATA := "gd-playwright: Scan Scene For Metadata"
+const MENU_CONVERT_METADATA := "gd-playwright: Convert Metadata To Tags"
 
 func _enter_tree() -> void:
 	_register_project_settings()
@@ -102,22 +102,22 @@ func _editor_icon(preferred_name: String, fallback_name: String) -> Texture2D:
 func _scan_scene_for_metadata() -> void:
 	var root: Node = _get_edited_scene_root()
 	if root == null:
-		push_warning("GD Playwright: open a scene before scanning metadata.")
+		push_warning("gd-playwright: open a scene before scanning metadata.")
 		return
 	var result: Dictionary = _scan_metadata_recursive(root)
-	print("GD Playwright: found %d playwright metadata entries and %d PlaywrightTag nodes." % [int(result.get("metadata", 0)), int(result.get("tags", 0))])
+	print("gd-playwright: found %d playwright metadata entries and %d PlaywrightTag nodes." % [int(result.get("metadata", 0)), int(result.get("tags", 0))])
 
 func _convert_metadata_to_tags() -> void:
 	var root: Node = _get_edited_scene_root()
 	if root == null:
-		push_warning("GD Playwright: open a scene before converting metadata.")
+		push_warning("gd-playwright: open a scene before converting metadata.")
 		return
 	var converted: int = _convert_metadata_recursive(root, root)
 	if converted > 0:
 		var editor_interface: EditorInterface = get_editor_interface()
 		if editor_interface != null and editor_interface.has_method("mark_scene_as_unsaved"):
 			editor_interface.call("mark_scene_as_unsaved")
-	print("GD Playwright: converted %d playwright metadata entries to PlaywrightTag nodes and removed converted metadata." % converted)
+	print("gd-playwright: converted %d playwright metadata entries to PlaywrightTag nodes and removed converted metadata." % converted)
 
 func _get_edited_scene_root() -> Node:
 	var editor_interface: EditorInterface = get_editor_interface()

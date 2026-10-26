@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the GDAM asset from the repository's closed addon manifest."""
+"""Build the gdam asset from the repository's closed addon manifest."""
 
 from __future__ import annotations
 
