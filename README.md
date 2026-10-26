@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 2bf80e73e0c563709555044ab469a2a8dd41aad5098e45b927e345e8b089781a -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 421e15566ff62e4dba3d5de615f15254aeda4c4bbd2655fa62cc49872b365d13 -->
 
 # gd-playwright
 
@@ -293,3 +293,7 @@ PlaywrightService.configure(
 ## License
 
 See `LICENSE`.
+
+## Repository development
+
+Install the [Komizo release](https://github.com/nicodes/komizo#install) matching `komizo.lock`, then run `komizo check`. The locked addon recipe supplies Godot and templates; the project retains its Go, package and installed-editor checks, plus browser and web-export assertions. Use `komizo run test` for the focused test suite.

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "recipe": "godot-addon",
+  "repository": "aviorstudio/gd-playwright",
+  "tools": {
+    "go": "1.27.3",
+    "bun": "1.4.1",
+    "node": "24.18.1",
+    "actionlint": "1.7.12",
+    "shellcheck": "0.11.0"
+  },
+  "artifacts": [
+    "dist",
+    ".artifacts/bin"
+  ],
+  "stages": {
+    "install": [
+      [
+        "python3",
+        "-c",
+        "import os,runpy;runpy.run_path(os.environ[\"CICD_ENGINEERING\"]+\"/helpers/godot-addon.py\",run_name=\"__main__\")",
+        "install"
+      ],
+      [
+        "bash",
+        "scripts/profile.sh",
+        "install"
+      ]
+    ],
+    "clean": [
+      [
+        "python3",
+        "-c",
+        "import os,runpy;runpy.run_path(os.environ[\"CICD_ENGINEERING\"]+\"/helpers/godot-addon.py\",run_name=\"__main__\")",
+        "clean"
+      ],
+      [
+        "python3",
+        "-c",
+        "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in (\".godot\", \"tools/browser/node_modules\", \".playwright-cli\")]"
+      ]
+    ]
+  },
+  "validation": {
+    "workflow": {
+      "required": [
+        "ci.yml",
+        "dependency-policy.yml",
+        "release.yml"
+      ],
+      "ci_gates": [
+        "Test"
+      ]
+    }
+  }
+}
