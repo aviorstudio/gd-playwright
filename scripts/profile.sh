@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-tools="$(python3 scripts/engineering-bootstrap.py)"
 export GODOT_BIN="$PWD/.artifacts/godot/bin/godot"
 export XDG_DATA_HOME="$PWD/.artifacts/godot-data"
 export PLAYWRIGHT_BROWSERS_PATH="$PWD/.artifacts/playwright"
@@ -11,10 +10,6 @@ case "${1:-}" in
 install)
     mkdir -p .artifacts
     touch .artifacts/.gdignore
-    python3 "$tools/helpers/godot-setup.py" --version 4.7.2 --origin godot-builds \
-      --binary-checksum sha512:9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65 \
-      --templates --templates-checksum sha512:ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079 \
-      --root "$PWD/.artifacts/godot"
     test -s "$XDG_DATA_HOME/godot/export_templates/4.7.2.stable/web_release.zip"
     (cd cli && go mod download)
     npm ci --prefix tools/browser --no-audit --no-fund
