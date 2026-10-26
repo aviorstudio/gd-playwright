@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 421e15566ff62e4dba3d5de615f15254aeda4c4bbd2655fa62cc49872b365d13 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 1fa4ae5c5442c6cb10848f6bb30de8c543d791938b267f1f662de7838f4e5a6c -->
 
 # gd-playwright
 
@@ -24,7 +24,7 @@ gdam install @aviorstudio/gd-playwright
 
 ### Manual
 
-Copy `gd/addon/` into `res://addons/@aviorstudio_gd-playwright/` and enable `GD Playwright Client` in `Project Settings -> Plugins`.
+Copy `gd/addon/` into `res://addons/@aviorstudio_gd-playwright/` and enable `gd-playwright` in `Project Settings -> Plugins`.
 
 The plugin installs an autoload named `PlaywrightService`. You can also add `autoload.gd` manually as an autoload with that name.
 
@@ -72,8 +72,8 @@ PlaywrightService.scan_scene()
 
 The editor also includes tool menu actions:
 
-- `GD Playwright: Scan Scene For Metadata`
-- `GD Playwright: Convert Metadata To Tags`
+- `gd-playwright: Scan Scene For Metadata`
+- `gd-playwright: Convert Metadata To Tags`
 
 Use `PlaywrightEventEmitter` when a scene should author a named event in the Inspector:
 
@@ -296,4 +296,4 @@ See `LICENSE`.
 
 ## Repository development
 
-Install the [Komizo release](https://github.com/nicodes/komizo#install) matching `komizo.lock`, then run `komizo check`. The locked addon recipe supplies Godot and templates; the project retains its Go, package and installed-editor checks, plus browser and web-export assertions. Use `komizo run test` for the focused test suite.
+Install the [komizo release](https://github.com/nicodes/komizo#install) matching `komizo.lock`, then run `komizo check`. The locked addon recipe supplies Godot and templates; the project retains its Go, package and installed-editor checks, plus browser and web-export assertions. Use `komizo run test` for the focused test suite.
