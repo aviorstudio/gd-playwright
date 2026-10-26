@@ -5,3 +5,7 @@ dist/
 
 .artifacts/
 .playwright-cli/
+
+.komizo.mise*.toml
+
+.komizo.mise*.lock
