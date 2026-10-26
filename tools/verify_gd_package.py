@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed unless a GDAM ZIP contains exactly the declared regular files."""
+"""Fail closed unless a gdam ZIP contains exactly the declared regular files."""
 
 from __future__ import annotations
 
