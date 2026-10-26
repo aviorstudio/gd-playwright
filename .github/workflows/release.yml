@@ -36,7 +36,7 @@ jobs:
         fetch-depth: 0
         persist-credentials: false
     - name: Set up locked Komizo
-      uses: nicodes/komizo/setup@c5f5ce398dcae5c7b3f8157e8331e7fcdf0c9e03
+      uses: nicodes/komizo/setup@40086036977a5fc0119d6c4c1d5eb6ae3ab3b4b9
       env:
         GH_TOKEN: ${{ github.token }}
       timeout-minutes: 5
@@ -72,7 +72,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
     - name: Check project
-      uses: nicodes/komizo/run@c5f5ce398dcae5c7b3f8157e8331e7fcdf0c9e03
+      uses: nicodes/komizo/run@40086036977a5fc0119d6c4c1d5eb6ae3ab3b4b9
       with:
         target: check
     - name: Build CLI release artifacts
