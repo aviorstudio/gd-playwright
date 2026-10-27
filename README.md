@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 1fa4ae5c5442c6cb10848f6bb30de8c543d791938b267f1f662de7838f4e5a6c -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: b28d3f618fa66c35e79fe52ddaccec1f2b65337dfd9d064855b8dce8e1ec7f0c -->
 
 # gd-playwright
 
@@ -144,6 +144,17 @@ PlaywrightService.clear_test_state("puzzle")
 ```
 
 ## Install The CLI
+
+Linux and macOS, x86_64 or arm64:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/aviorstudio/gd-playwright/main/cli/install.sh | sh
+```
+
+The installer selects a published `cli-v` release, verifies the archive checksum and installs `gdpw` into `~/.local/bin`. Go is not required. Use `--version` or `--install-dir` through `sh -s --` for a specific release or destination.
+
+### Optional source build
+
 
 Requires Go 1.24+.
 
