@@ -1,0 +1,6 @@
+[
+  {
+    "source": "cli/.claude/skills/godot-game/SKILL.prompt",
+    "target": "cli/.claude/skills/godot-game/SKILL.md"
+  }
+]

@@ -17,6 +17,10 @@
     "install": [
       [
         "python3",
+        "scripts/prepare-runtime.py"
+      ],
+      [
+        "python3",
         "-c",
         "import os,runpy;runpy.run_path(os.environ[\"CICD_ENGINEERING\"]+\"/helpers/godot-addon.py\",run_name=\"__main__\")",
         "install"
