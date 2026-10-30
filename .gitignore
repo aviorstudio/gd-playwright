@@ -6,9 +6,8 @@ dist/
 .artifacts/
 .playwright-cli/
 
-.komizo.mise*.toml
 
-.komizo.mise*.lock
 
 # Native runtime files generated from functional inputs.
 /cli/.claude/skills/godot-game/SKILL.md
+/.ci-tools/

@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 3824cfbb296d1b3b384bbbe4b6b535355898710b53deb6242ddc163cd2662ea2 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 4453c78d88ab4433d15809541602c28707afa2ed383a8fa55382ea33b25010c7 -->
 
 # gd-playwright
 
@@ -314,3 +314,16 @@ python3 scripts/prepare-runtime.py
 ```
 
 This creates the native discovery files from the tracked functional inputs. Run it again after pulling an update; if a generated file has local edits, preserve those edits before replacing it.
+
+## Contributor checks
+
+Install [mise](https://mise.jdx.dev/), then prepare the pinned development helpers and run the complete native gate:
+
+```sh
+git clone https://github.com/nicodes/tools.git .ci-tools
+git -C .ci-tools checkout --detach f7e243524ce2aa29f299e4c79db33001f72f4a30
+mise install
+mise run check
+```
+
+`mise.toml` owns tool versions and tasks. Engine and template downloads are checksum verified. `mise run build` packages the addon; `mise run test` runs its declared tests. The complete check also validates the installed artifact. Build and test receipts stay in `.artifacts/verification`.
