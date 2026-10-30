@@ -37,7 +37,7 @@ jobs:
         fetch-depth: 0
         persist-credentials: false
     - name: Set up locked komizo
-      uses: nicodes/komizo/setup@40086036977a5fc0119d6c4c1d5eb6ae3ab3b4b9
+      uses: nicodes/komizo/setup@2ca94e2fd4bb05f41bb228e9c366e5cc733c75e6
       env:
         GH_TOKEN: ${{ github.token }}
       timeout-minutes: 5
@@ -73,7 +73,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
     - name: Check project
-      uses: nicodes/komizo/run@40086036977a5fc0119d6c4c1d5eb6ae3ab3b4b9
+      uses: nicodes/komizo/run@2ca94e2fd4bb05f41bb228e9c366e5cc733c75e6
       with:
         target: check
     - name: Build CLI release artifacts
@@ -157,7 +157,7 @@ jobs:
         "Release $TAG from tested commit $GITHUB_SHA"
     - name: Publish addon
       if: inputs.target == 'gd'
-      uses: aviorstudio/gdam-actions/publish@6677226d9353df1d410f3e7f5075e13b3b7d5308
+      uses: aviorstudio/gdam-actions/publish@3a46007e296e60e15a4ad47727ad33046e52e6ea
       with:
         tag: ${{ needs.gate.outputs.tag }}
         addon: '@aviorstudio/gd-playwright'
@@ -167,11 +167,11 @@ jobs:
   publish-cli:
     name: Publish release
     needs: gate
-    uses: nicodes/tools/.github/workflows/cli-publish.yml@a404cbcef2a2ccfb7a9aa1961f5d893e0c31ad42
+    uses: nicodes/tools/.github/workflows/cli-publish.yml@9590742a455154ac5967a67952c5758d79d476b9
     permissions:
       contents: write
     with:
-      tools-ref: 'a404cbcef2a2ccfb7a9aa1961f5d893e0c31ad42'
+      tools-ref: '9590742a455154ac5967a67952c5758d79d476b9'
       binary: gdpw
       tag: ${{ needs.gate.outputs.tag }}
       artifact-id: ${{ needs.gate.outputs.artifact-id }}
