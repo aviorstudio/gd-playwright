@@ -11,3 +11,5 @@ dist/
 # Native runtime files generated from functional inputs.
 /cli/.claude/skills/godot-game/SKILL.md
 /.ci-tools/
+
+/cli/target/

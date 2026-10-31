@@ -52,3 +52,8 @@ jobs:
         mise run check
     env:
       MISE_GITHUB_TOKEN: ${{ github.token }}
+
+  native-cli:
+    uses: ./.github/workflows/cli-native.yml
+    permissions:
+      contents: read

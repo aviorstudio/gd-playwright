@@ -1,84 +1,4 @@
-package runcode
-
-import (
-	"encoding/json"
-	"fmt"
-	"strings"
-)
-
-// Confirmation describes the fresh Godot event that acknowledges an action.
-type Confirmation struct {
-	Event     string            `json:"event"`
-	Filters   map[string]string `json:"filters,omitempty"`
-	TimeoutMS int               `json:"timeoutMs"`
-}
-
-// ActionOptions configures one browser-local click or drag operation.
-type ActionOptions struct {
-	Action       string        `json:"action"`
-	Key          string        `json:"key"`
-	ToKey        string        `json:"toKey,omitempty"`
-	To           *Point        `json:"to,omitempty"`
-	Force        bool          `json:"force,omitempty"`
-	Confirm      *Confirmation `json:"confirm,omitempty"`
-	Retries      int           `json:"retries"`
-	RetryDelayMS int           `json:"retryDelayMs"`
-	Steps        int           `json:"steps"`
-}
-
-// Point is a page-space Playwright mouse coordinate.
-type Point struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-}
-
-// RenderAction renders a self-contained playwright-cli run-code function.
-func RenderAction(options ActionOptions) (string, error) {
-	if options.Action != "click" && options.Action != "drag" {
-		return "", fmt.Errorf("unsupported action %q", options.Action)
-	}
-	if strings.TrimSpace(options.Key) == "" {
-		return "", fmt.Errorf("element key is required")
-	}
-	if options.Action == "drag" && options.ToKey == "" && options.To == nil {
-		return "", fmt.Errorf("drag requires a destination key or point")
-	}
-	if options.Action == "drag" && options.ToKey != "" && options.To != nil {
-		return "", fmt.Errorf("drag accepts only one destination")
-	}
-	if options.Retries < 0 {
-		return "", fmt.Errorf("retries cannot be negative")
-	}
-	if options.Retries > 0 && options.Confirm == nil {
-		return "", fmt.Errorf("retries require --expect-event confirmation")
-	}
-	if options.RetryDelayMS <= 0 {
-		options.RetryDelayMS = 50
-	}
-	if options.Steps <= 0 {
-		options.Steps = 6
-	}
-	if options.Confirm != nil && options.Confirm.TimeoutMS <= 0 {
-		options.Confirm.TimeoutMS = 1000
-	}
-
-	payload, err := json.Marshal(options)
-	if err != nil {
-		return "", fmt.Errorf("marshal action options: %w", err)
-	}
-	return strings.Replace(actionTemplate, "__GDPW_OPTIONS__", string(payload), 1), nil
-}
-
-// ShellCommand wraps run-code for the documented `gdpw ... | sh` workflow.
-func ShellCommand(code string) string {
-	return "playwright-cli run-code " + quotePOSIX(code)
-}
-
-func quotePOSIX(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
-}
-
-const actionTemplate = `async page => {
+async page => {
   const options = __GDPW_OPTIONS__;
   const registryName = "__gdpwActionConfirmations";
 
@@ -176,4 +96,4 @@ const actionTemplate = `async page => {
   }
   const message = lastError && lastError.message ? lastError.message : String(lastError || "unknown error");
   throw new Error("gd-playwright action failed: " + message);
-}`
+}
