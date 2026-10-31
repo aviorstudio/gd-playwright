@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 4453c78d88ab4433d15809541602c28707afa2ed383a8fa55382ea33b25010c7 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: da4da1a4da5a868651c11483ebc59640db132ef101a90fd5b71b82d708a0ceb6 -->
 
 # gd-playwright
 
@@ -11,7 +11,7 @@ Use it when browser-based tests need stable names like `start_button` instead of
 ## Packages
 
 - `gd/`: Godot addon that exposes browser events, element positions, viewport state, and test state.
-- `cli/`: Go `gdpw` command-line helper for querying exported games through CDP.
+- `cli/`: Rust `gdpw` command-line helper for querying exported games through CDP.
 - `js/`: dependency-free Playwright helpers for live element resolution, confirmed actions, and retries.
 
 ## Install The Godot Addon
@@ -151,24 +151,18 @@ Linux and macOS, x86_64 or arm64:
 curl -fsSL https://raw.githubusercontent.com/aviorstudio/gd-playwright/main/cli/install.sh | sh
 ```
 
-The installer selects a published `cli-v` release, verifies the archive checksum and installs `gdpw` into `~/.local/bin`. Go is not required. Use `--version` or `--install-dir` through `sh -s --` for a specific release or destination.
+The installer selects a published `cli-v` release, verifies the archive checksum and installs `gdpw` into `~/.local/bin`. Rust is not required to run the release binary. Use `--version` or `--install-dir` through `sh -s --` for a specific release or destination.
 
 ### Optional source build
 
 
-Requires Go 1.24+.
+Requires the pinned Rust 1.94.0 toolchain.
 
 ```sh
-go install github.com/aviorstudio/gd-playwright/cli/cmd/gdpw@latest
+cargo build --release --locked --manifest-path cli/Cargo.toml
 ```
 
-Or build from source:
-
-```sh
-cd cli
-mkdir -p bin
-go build -o bin/gdpw ./cmd/gdpw/
-```
+The executable is `cli/target/release/gdpw` (`gdpw.exe` on Windows).
 
 Or use the helper script:
 
