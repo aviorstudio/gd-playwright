@@ -35,6 +35,7 @@ test)
     bash gd/tests/test_runner_test.sh
     cargo test --locked --manifest-path cli/Cargo.toml
     python3 tests/installer_test.py
+    python3 tests/tls_test.py
     (cd js && bun test)
     bash gd/tests/test.sh
     ;;
