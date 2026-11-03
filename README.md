@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: da4da1a4da5a868651c11483ebc59640db132ef101a90fd5b71b82d708a0ceb6 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 73aa53453cd26f0966f484a81f22a7e73128e719e329f40d708ec30002f65d1d -->
 
 # gd-playwright
 
@@ -321,3 +321,13 @@ mise run check
 ```
 
 `mise.toml` owns tool versions and tasks. Engine and template downloads are checksum verified. `mise run build` packages the addon; `mise run test` runs its declared tests. The complete check also validates the installed artifact. Build and test receipts stay in `.artifacts/verification`.
+
+## Contributor task interface
+
+Contributor tool versions and task entry points live in the native Mise configuration. Use `mise run lint` for source checks, `mise run test` for the applicable behavioral tests, and `mise run check` for the complete supported gate. `mise run clean` removes declared generated outputs while preserving source, credentials and retained data. This package has no separate Mise development service; use its native entry points directly.
+
+## Finite machine commands
+
+Use a leading `--json` for finite queries, status, events, waiting and generated scripts, such as `gdpw --json status` or `gdpw --json script click menuButton`. Machine stdout contains one complete JSON document; diagnostics use stderr and failures exit nonzero. A single successful `get` keeps its coordinate object. Multi-key `get` returns one object containing `elements`, `errors` and `ok`; empty event results are `[]`.
+
+`watch` retains its event stream and rejects `--json` before connecting. Connection selection remains explicit `--cdp`/`--port`, environment values, then local discovery. Script generation remains offline and does not execute browser input.

@@ -117,7 +117,7 @@ impl Config {
             other => return Err(format!("unknown command {other:?}").into()),
         };
         for key in used.iter().map(String::as_str) {
-            if !allowed.contains(&key) && !matches!(key, "cdp" | "port") {
+            if !allowed.contains(&key) && !matches!(key, "cdp" | "port" | "json") {
                 return Err(format!("unknown flag --{key} for {}", config.command).into());
             }
             if config.command == "script"

@@ -39,6 +39,10 @@ struct Event {
     data: Option<BTreeMap<String, Value>>,
 }
 
+static EMITTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub fn output_emitted() -> bool {
+    EMITTED.load(std::sync::atomic::Ordering::Relaxed)
+}
 fn print(value: &impl Serialize, pretty: bool) -> Result<()> {
     let mut out = io::stdout().lock();
     if pretty {
@@ -48,6 +52,7 @@ fn print(value: &impl Serialize, pretty: bool) -> Result<()> {
     }
     writeln!(out)?;
     out.flush()?;
+    EMITTED.store(true, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
 fn string(value: &Value) -> String {
@@ -117,6 +122,7 @@ async fn get(config: &Config, client: &mut cdp::Client) -> Result<()> {
         serde_json::from_value(result["canvas"].clone())?
     };
     let mut errors = Vec::new();
+    let mut machine_rows = Vec::new();
     for key in &config.args {
         let value = &result["elements"][key];
         if value.is_null() {
@@ -150,14 +156,21 @@ async fn get(config: &Config, client: &mut cdp::Client) -> Result<()> {
         }
         let [x, y, w, h] = scaled(&element, &viewport, &canvas);
         if config.flag("json") {
-            print(
-                &json!({"key":key,"x":x,"y":y,"w":w,"h":h,"visible":element.visible}),
-                false,
-            )?;
+            machine_rows.push(json!({"key":key,"x":x,"y":y,"w":w,"h":h,"visible":element.visible}));
         } else if config.args.len() > 1 {
             println!("{key} {x} {y}");
         } else {
             println!("{x} {y}");
+        }
+    }
+    if config.flag("json") {
+        if config.args.len() == 1 && errors.is_empty() && machine_rows.len() == 1 {
+            print(&machine_rows[0], false)?;
+        } else {
+            print(
+                &json!({"ok":errors.is_empty(),"elements":machine_rows,"errors":errors}),
+                false,
+            )?;
         }
     }
     if !errors.is_empty() {
@@ -213,10 +226,12 @@ async fn wait(config: &Config, client: &mut cdp::Client) -> Result<()> {
 
 pub async fn run(config: &Config) -> Result<()> {
     if config.command == "script" {
-        println!(
-            "{}",
-            action::shell(&action::render(config, &config.args[0], &config.args[1])?)
-        );
+        let script = action::shell(&action::render(config, &config.args[0], &config.args[1])?);
+        if config.flag("json") {
+            print(&json!({"script":script}), false)?;
+        } else {
+            println!("{script}");
+        }
         return Ok(());
     }
     if config.command == "get" && config.flag("script") && !config.flag("json") {
@@ -228,9 +243,13 @@ pub async fn run(config: &Config) -> Result<()> {
     let mut client = match cdp::connect(config).await {
         Ok(client) => client,
         Err(error) if config.command == "status" => {
-            println!(
-                "connected: false\nerror: {error}\n\nhint: set GDPW_PORT=<port> or pass --port=<port>"
-            );
+            if config.flag("json") {
+                print(&json!({"connected":false,"error":error.to_string()}), false)?;
+            } else {
+                println!(
+                    "connected: false\nerror: {error}\n\nhint: set GDPW_PORT=<port> or pass --port=<port>"
+                );
+            }
             return Ok(());
         }
         Err(error) => return Err(error),
@@ -260,6 +279,18 @@ pub async fn run(config: &Config) -> Result<()> {
         }
         "state" => print(&client.json(include_str!("state.js")).await?, true)?,
         "status" => {
+            if config.flag("json") {
+                let value = match client.json(include_str!("status.js")).await {
+                    Ok(mut value) if value.is_object() => {
+                        value["connected"] = json!(true);
+                        value["ready"] = json!(true);
+                        value
+                    }
+                    _ => json!({"connected":true,"ready":false}),
+                };
+                print(&value, false)?;
+                return Ok(());
+            }
             match client
                 .evaluate(include_str!("status.js"), Duration::from_secs(5))
                 .await
@@ -312,7 +343,7 @@ pub async fn run(config: &Config) -> Result<()> {
                         && matches(event, &filters)
                 })
                 .collect();
-            if events.is_empty() {
+            if events.is_empty() && !config.flag("json") {
                 println!("no events");
             } else {
                 print(&events, true)?;
