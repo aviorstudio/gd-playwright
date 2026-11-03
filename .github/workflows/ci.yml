@@ -54,6 +54,7 @@ jobs:
       MISE_GITHUB_TOKEN: ${{ github.token }}
 
   native-cli:
+    name: "Build native CLI"
     uses: ./.github/workflows/cli-native.yml
     permissions:
       contents: read
