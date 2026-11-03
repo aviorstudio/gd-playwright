@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 73aa53453cd26f0966f484a81f22a7e73128e719e329f40d708ec30002f65d1d -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: ca58c664c8a37b77897a81853e456d615f0b2d97e2203d6abf563920011d2c68 -->
 
 # gd-playwright
 
@@ -24,7 +24,7 @@ gdam install @aviorstudio/gd-playwright
 
 ### Manual
 
-Copy `gd/addon/` into `res://addons/@aviorstudio_gd-playwright/` and enable `gd-playwright` in `Project Settings -> Plugins`.
+Copy `addon/` into `res://addons/@aviorstudio_gd-playwright/` and enable `gd-playwright` in `Project Settings -> Plugins`.
 
 The plugin installs an autoload named `PlaywrightService`. You can also add `autoload.gd` manually as an autoload with that name.
 

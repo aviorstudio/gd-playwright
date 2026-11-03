@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-RUNNER="$ROOT_DIR/gd/tests/test.sh"
+RUNNER="$ROOT_DIR/tests/godot/test.sh"
 TEMP=$(mktemp -d)
 trap 'rm -rf "$TEMP"' EXIT
 SCRIPTS="$TEMP/scripts"
