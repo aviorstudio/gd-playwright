@@ -208,3 +208,32 @@ async fn script_commands_are_offline_and_keep_safe_retry_options() {
     .await;
     assert!(!result.status.success());
 }
+
+#[tokio::test]
+async fn finite_machine_queries_emit_one_document_for_multiple_elements_and_empty_events() {
+    let (result,_) = query(&["--json","get","one","two"],|_,_|json!({"elements":{"one":{"x":1,"y":2,"w":3,"h":4,"visible":true},"two":{"x":5,"y":6,"w":7,"h":8,"visible":true}}})).await;
+    assert!(result.status.success());
+    let value: Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(value["elements"].as_array().unwrap().len(), 2);
+    let (result, _) = query(&["--json", "events"], |_, _| json!([])).await;
+    assert!(result.status.success());
+    assert_eq!(
+        serde_json::from_slice::<Value>(&result.stdout).unwrap(),
+        json!([])
+    );
+    let (result, _) = query(&["--json", "status"], |_, _| json!({"element_count":2})).await;
+    let value: Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(value["connected"], true);
+    assert_eq!(value["element_count"], 2);
+}
+#[tokio::test]
+async fn machine_script_is_offline_and_watch_is_refused_before_connecting() {
+    let result = output(command(&["--json", "script", "click", "menuButton"])).await;
+    assert!(result.status.success());
+    let value: Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert!(value["script"].as_str().unwrap().contains("menuButton"));
+    let result = output(command(&["--json", "watch"])).await;
+    assert!(!result.status.success());
+    let value: Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(value["error"]["code"], "invalid_usage");
+}
