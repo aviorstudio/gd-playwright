@@ -56,7 +56,7 @@ def verify(archive_path: Path, manifest_path: Path) -> tuple[str, str]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("archive", type=Path)
-    parser.add_argument("--manifest", type=Path, default=Path("gd/package-manifest.txt"))
+    parser.add_argument("--manifest", type=Path, default=Path("scripts/package/manifest.txt"))
     args = parser.parse_args()
     zip_digest, tree_digest = verify(args.archive, args.manifest)
     print(f"GD_PACKAGE_SHA256={zip_digest}")

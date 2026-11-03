@@ -61,8 +61,8 @@ def package(source: Path, manifest: Path, output: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source", type=Path, default=Path("gd/addon"))
-    parser.add_argument("--manifest", type=Path, default=Path("gd/package-manifest.txt"))
+    parser.add_argument("--source", type=Path, default=Path("./addon"))
+    parser.add_argument("--manifest", type=Path, default=Path("scripts/package/manifest.txt"))
     parser.add_argument("--output", type=Path, default=Path("dist/@aviorstudio_gd-playwright.zip"))
     args = parser.parse_args()
     package(args.source, args.manifest, args.output)

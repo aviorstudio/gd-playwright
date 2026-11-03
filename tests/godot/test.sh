@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 SCRIPT_DIR="${GD_TEST_SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-ROOT_DIR="${GD_TEST_PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+ROOT_DIR="${GD_TEST_PROJECT_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 GODOT="${GODOT_BIN:-godot}"
 TEST_TIMEOUT_SECONDS="${GD_TEST_TIMEOUT_SECONDS:-30}"
 FAILURES=0

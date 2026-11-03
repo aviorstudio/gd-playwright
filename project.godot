@@ -1,0 +1,5 @@
+[application]
+config/name="gd-playwright tests"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
