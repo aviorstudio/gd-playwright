@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createServer } from 'node:net';
-import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright';
 
 const exec = promisify(execFile);
-const binary = resolve('.artifacts/bin/gdpw');
+const binary = process.env.GDPW_BINARY || 'gd-playwright-cli';
 const listener = createServer();
 await new Promise(resolve => listener.listen(0, '127.0.0.1', resolve));
 const port = listener.address().port;
@@ -43,7 +42,7 @@ try {
   const generated = await run('get', 'start_button', '--script');
   assert(generated.startsWith('playwright-cli run-code '));
   assert.equal(await page.evaluate(() => window.godotTestState.fixture.input), false);
-  console.log('ASSERTION_REACHED Rust gdpw reads live diagnostic export without input');
+  console.log('ASSERTION_REACHED Rust gd-playwright-cli reads live diagnostic export without input');
 } finally {
   await browser.close();
 }
