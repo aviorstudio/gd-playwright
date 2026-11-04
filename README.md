@@ -1,18 +1,18 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: ca58c664c8a37b77897a81853e456d615f0b2d97e2203d6abf563920011d2c68 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 975b18726de485b62c668429763f5d86840ea8e47a237a2f28051d7d89230465 -->
 
 # gd-playwright
 
 Playwright tooling for Godot web exports.
 
-This repo contains the Godot addon that emits test metadata from a web export, the read-only `gdpw` CLI that queries that metadata and generates Playwright actions, and JavaScript helpers for controlling active games from a persistent Playwright process.
+This repository contains the Godot addon that emits test metadata from a web export. The [gd-playwright-cli CLI](https://github.com/aviorstudio/gd-playwright-cli) and [JavaScript helpers](https://github.com/aviorstudio/gd-playwright-js) are separate companion repositories.
 
 Use it when browser-based tests need stable names like `start_button` instead of hardcoded screen coordinates.
 
 ## Packages
 
-- `gd/`: Godot addon that exposes browser events, element positions, viewport state, and test state.
-- `cli/`: Rust `gdpw` command-line helper for querying exported games through CDP.
-- `js/`: dependency-free Playwright helpers for live element resolution, confirmed actions, and retries.
+- `addon/`: Godot addon that exposes browser events, element positions, viewport state, and test state.
+- [`gd-playwright-cli`](https://github.com/aviorstudio/gd-playwright-cli): Rust `gd-playwright-cli` helper for querying exported games through CDP.
+- [`gd-playwright-js`](https://github.com/aviorstudio/gd-playwright-js): dependency-free Playwright helpers for live element resolution, confirmed actions, and retries.
 
 ## Install The Godot Addon
 
@@ -148,28 +148,12 @@ PlaywrightService.clear_test_state("puzzle")
 Linux and macOS, x86_64 or arm64:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/aviorstudio/gd-playwright/main/cli/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aviorstudio/gd-playwright-cli/main/scripts/install.sh | sh
 ```
 
-The installer selects a published `cli-v` release, verifies the archive checksum and installs `gdpw` into `~/.local/bin`. Rust is not required to run the release binary. Use `--version` or `--install-dir` through `sh -s --` for a specific release or destination.
+The installer selects a published `cli-v` release, verifies the archive checksum and installs `gd-playwright-cli` into `~/.local/bin`. Rust is not required to run the release binary. Use `--version` or `--install-dir` through `sh -s --` for a specific release or destination.
 
-### Optional source build
-
-
-Requires the pinned Rust 1.94.0 toolchain.
-
-```sh
-cargo build --release --locked --manifest-path cli/Cargo.toml
-```
-
-The executable is `cli/target/release/gdpw` (`gdpw.exe` on Windows).
-
-Or use the helper script:
-
-```sh
-cd cli
-./build.sh
-```
+Build the CLI from source in [gd-playwright-cli](https://github.com/aviorstudio/gd-playwright-cli), following that repository’s README.
 
 ## CLI Quick Start
 
@@ -177,11 +161,11 @@ cd cli
 # Open the game in a browser.
 playwright-cli open http://localhost:3000 --headed
 
-# See what the addon exposed. gdpw discovers playwright-cli's CDP port.
-gdpw list --visible
+# See what the addon exposed. gd-playwright-cli discovers playwright-cli's CDP port.
+gd-playwright-cli list --visible
 
 # Get coordinates for an element.
-gdpw get start_button
+gd-playwright-cli get start_button
 
 # Click it via playwright-cli.
 playwright-cli mousemove 360 640
@@ -189,19 +173,19 @@ playwright-cli mousedown
 playwright-cli mouseup
 
 # Wait for a new event.
-gdpw wait route_loaded
+gd-playwright-cli wait route_loaded
 ```
 
 ## Active Game Actions
 
-Moving game objects should be resolved immediately before browser input. `gdpw` remains read-only: these commands print one `playwright-cli run-code` command, and Playwright performs the input when the output is executed.
+Moving game objects should be resolved immediately before browser input. `gd-playwright-cli` remains read-only: these commands print one `playwright-cli run-code` command, and Playwright performs the input when the output is executed.
 
 ```sh
 # Atomic browser-local click.
-gdpw get play_button --script | sh
+gd-playwright-cli get play_button --script | sh
 
 # Retry a moving-target drag only when the expected fresh event is missing.
-gdpw script drag enemy_1 \
+gd-playwright-cli script drag enemy_1 \
   --to 1000,260 \
   --expect-event enemy_released \
   --filter id=1 \
@@ -210,7 +194,7 @@ gdpw script drag enemy_1 \
 
 Every attempt re-reads `window.godotElements`, viewport scaling, and the canvas rectangle. Confirmation listeners are armed before input, and drag failures always attempt to release the mouse.
 
-For sustained active-game tests, import the JavaScript helper package in a Playwright test so decisions and input stay in one process:
+For sustained active-game tests, install the [JavaScript helper package](https://github.com/aviorstudio/gd-playwright-js) and import it in a Playwright test so decisions and input stay in one process:
 
 ```js
 import { dragElement } from "@aviorstudio/gd-playwright";
@@ -237,7 +221,7 @@ Retries are not exactly-once delivery. Keep them disabled for non-idempotent act
 | `state` | Show aggregated state: test state, elements, viewport, and latest events by type. |
 | `script click/drag` | Generate atomic Playwright actions with optional fresh-event confirmation and retries. |
 
-`gdpw` resolves its browser connection in this order:
+`gd-playwright-cli` resolves its browser connection in this order:
 
 1. `--cdp ws://...`
 2. `--port <N>`
@@ -268,7 +252,7 @@ The Godot addon writes generic browser globals during enabled web runs:
 - `window.godotEvents`: buffered event records emitted by game code.
 - `window.godotTestState`: namespaced test state dictionaries.
 
-`gdpw` reads those globals through CDP. It never mutates browser or game state and it never calls `playwright-cli`; it only provides data that another tool can use for input.
+`gd-playwright-cli` reads those globals through CDP. It never mutates browser or game state and it never calls `playwright-cli`; it only provides data that another tool can use for input.
 
 ## Safety Notes
 
@@ -278,7 +262,7 @@ The Godot addon writes generic browser globals during enabled web runs:
 - Validation walks each accepted payload once, handles primitive leaves without per-value frame dictionaries, and reuses repeated key classifications only for that publication. Element publication reuses internal wire views only while each entry's public fields remain unchanged; it still serializes a fresh full-map payload before publication. Enabled browser publication also reuses one fixed receiver per owner. These are internal safeguards only: publication remains synchronous, events retain order/detail, and element updates still replace the full map at the existing cadence.
 - Calls are safe to leave in game code because disabled features no-op.
 - Do not expose private player data through test state or event payloads.
-- Game-specific knowledge belongs in game docs or skills, not in `gdpw`.
+- Game-specific knowledge belongs in game docs or skills, not in `gd-playwright-cli`.
 
 Example diagnostic release configuration:
 
@@ -328,6 +312,6 @@ Contributor tool versions and task entry points live in the native Mise configur
 
 ## Finite machine commands
 
-Use a leading `--json` for finite queries, status, events, waiting and generated scripts, such as `gdpw --json status` or `gdpw --json script click menuButton`. Machine stdout contains one complete JSON document; diagnostics use stderr and failures exit nonzero. A single successful `get` keeps its coordinate object. Multi-key `get` returns one object containing `elements`, `errors` and `ok`; empty event results are `[]`.
+Use a leading `--json` for finite queries, status, events, waiting and generated scripts, such as `gd-playwright-cli --json status` or `gd-playwright-cli --json script click menuButton`. Machine stdout contains one complete JSON document; diagnostics use stderr and failures exit nonzero. A single successful `get` keeps its coordinate object. Multi-key `get` returns one object containing `elements`, `errors` and `ok`; empty event results are `[]`.
 
 `watch` retains its event stream and rejects `--json` before connecting. Connection selection remains explicit `--cdp`/`--port`, environment values, then local discovery. Script generation remains offline and does not execute browser input.
