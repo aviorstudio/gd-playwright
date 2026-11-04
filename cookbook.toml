@@ -39,6 +39,9 @@ timeout = 1200
 args = ["dist/@aviorstudio_gd-playwright.zip"]
 
 [publication]
+digests = "gd-package-digests.txt"
+validation_timeout = 30
+publish_timeout = 10
 tag_prefix = "gd-v"
 initial = "first"
 
