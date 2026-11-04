@@ -1,0 +1,50 @@
+version = 1
+recipe = "godot-addon"
+
+[package]
+source = "addon"
+manifest = "package.files"
+archive = "dist/@aviorstudio_gd-playwright.zip"
+
+[lint]
+required_paths = ["addon/plugin.cfg", "addon/plugin.gd", "package.files"]
+
+[format]
+paths = ["addon", "tests"]
+
+[clean]
+paths = ["dist", ".artifacts/build", ".artifacts/godot", ".artifacts/godot-data", ".artifacts/playwright", ".artifacts/tmp", ".godot"]
+
+[[tests.unit]]
+runner = "bash"
+path = "tests/godot/test_runner_test.sh"
+timeout = 300
+
+[[tests.unit]]
+runner = "godot-suite"
+path = "tests/godot"
+sentinel = "PASS gd-playwright"
+timeout = 30
+
+[[tests.integration]]
+runner = "bash"
+path = "tests/godot/package_lifecycle_test.sh"
+timeout = 300
+args = ["dist/@aviorstudio_gd-playwright.zip"]
+
+[[tests.e2e]]
+runner = "bash"
+path = "tests/godot/web_export_test.sh"
+timeout = 1200
+args = ["dist/@aviorstudio_gd-playwright.zip"]
+
+[publication]
+tag_prefix = "gd-v"
+initial = "first"
+
+[node]
+packages = ["tests/browser"]
+
+[components.browser]
+package = "tests/browser"
+cli_version = "0.1.18"
