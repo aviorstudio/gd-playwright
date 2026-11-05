@@ -10,7 +10,7 @@ archive = "dist/@aviorstudio_gd-playwright.zip"
 required_paths = ["addon/plugin.cfg", "addon/plugin.gd", "package.files"]
 
 [format]
-paths = ["addon", "tests"]
+paths = ["addon", "tests/godot/element_map_service_test.gd", "tests/godot/playwright_helpers_test.gd", "tests/godot/playwright_service_test.gd", "tests/godot/playwright_tag_node_test.gd"]
 
 [clean]
 paths = ["dist", ".artifacts/build", ".artifacts/godot", ".artifacts/godot-data", ".artifacts/playwright", ".artifacts/tmp", ".godot"]
