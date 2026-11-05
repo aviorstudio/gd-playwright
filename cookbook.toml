@@ -51,3 +51,6 @@ packages = ["tests/browser"]
 [components.browser]
 package = "tests/browser"
 cli_version = "0.1.18"
+
+[ci]
+timeout_minutes = 30
