@@ -1,6 +1,6 @@
 # Generated cookbook entrypoint. Change cookbook.toml and regenerate.
 # Recipe data SHA256: 9dccd65e8a0a8bac7fb33f4161bb0c242fab63d59eee4c46a7b9772207b3d158
-COOKBOOK_REF := 0d59d20fe90e62af905e5e959caafff64ec9d18e
+COOKBOOK_REF := d475b54c402754a5a37a44fbd65328551995025c
 COOKBOOK_RECIPE := godot-addon
 COOKBOOK_ROOT ?= .artifacts/cookbook/$(COOKBOOK_REF)
 COOKBOOK_TEST_SUITES := lint unit security integration e2e
@@ -14,7 +14,7 @@ ifeq ($(wildcard $(COOKBOOK_ENTRY)),)
 .DEFAULT_GOAL := help
 .PHONY: help setup
 help:
-	@printf '%s\n' 'make help' 'make setup' 'make fmt' 'make build' 'make test' 'make test:lint' 'make test:unit' 'make test:security' 'make test:integration' 'make test:e2e' 'make clean'
+	@printf '%s\n' 'make help               List implemented commands' 'make setup              Prepare pinned tools and dependencies' 'make fmt                Apply formatting' 'make build              Compile, package and validate outputs' 'make test               Run implemented test groups without building' 'make test:lint          Check formatting, code and configuration' 'make test:unit          Run isolated behavior tests' 'make test:security      Run applicable security checks' 'make test:integration   Test real component boundaries' 'make test:e2e           Run complete product journeys; requires current build' 'make clean              Remove declared outputs; preserve retained data'
 	@printf '%s\n' 'Run make setup once to fetch the pinned cookbook and prepare dependencies.'
 setup:
 	@mkdir -p "$(COOKBOOK_ROOT)"
