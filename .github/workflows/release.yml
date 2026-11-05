@@ -14,12 +14,13 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    uses: nicodes/tools/.github/workflows/cookbook-addon-release.yml@0d59d20fe90e62af905e5e959caafff64ec9d18e
+    uses: nicodes/tools/.github/workflows/cookbook-addon-release.yml@29171802204d39c4ad70794078bfaaa485003531
     permissions:
       contents: write
       actions: read
+      pull-requests: read
     with:
-      tools-ref: 0d59d20fe90e62af905e5e959caafff64ec9d18e
+      tools-ref: 29171802204d39c4ad70794078bfaaa485003531
       mode: release
       bump: ${{ inputs.bump }}
     secrets:
