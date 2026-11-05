@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 975b18726de485b62c668429763f5d86840ea8e47a237a2f28051d7d89230465 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 3d46396eb71df9b3fb6768f2a432a6b2335ecac3c8d10f5af3122aabe7906f69 -->
 
 # gd-playwright
 
@@ -283,32 +283,21 @@ PlaywrightService.configure(
 
 See `LICENSE`.
 
-## Prepare runtime files
-
-After cloning this repository, run the following with Python 3 before loading its skills, agents, or plugins:
-
-```sh
-python3 scripts/prepare-runtime.py
-```
-
-This creates the native discovery files from the tracked functional inputs. Run it again after pulling an update; if a generated file has local edits, preserve those edits before replacing it.
-
 ## Contributor checks
 
-Install [mise](https://mise.jdx.dev/), then prepare the pinned development helpers and run the complete native gate:
+Install [mise](https://mise.jdx.dev/) and GNU Make, then run:
 
 ```sh
-git clone https://github.com/nicodes/tools.git .ci-tools
-git -C .ci-tools checkout --detach f7e243524ce2aa29f299e4c79db33001f72f4a30
-mise install
-mise run check
+make setup
+make build
+make test
 ```
 
-`mise.toml` owns tool versions and tasks. Engine and template downloads are checksum verified. `mise run build` packages the addon; `mise run test` runs its declared tests. The complete check also validates the installed artifact. Build and test receipts stay in `.artifacts/verification`.
+`mise.toml` pins SDK versions. `cookbook.toml` declares the addon package and its real tests; the generated Make entrypoint uses an exact shared cookbook revision from `nicodes/tools`. Setup installs the pinned editor, export templates and applicable dependencies. Build creates and verifies the closed addon archive; tests run source checks, native assertions, security checks and the declared packaged integration or browser checks. Packaged tests require the current verified build. Test commands do not run setup or rebuild the addon.
 
-## Contributor task interface
+`make help` lists the available commands. Use `make test:lint`, `make test:unit`, `make test:integration` or `make test:security` for an individual group, `make fmt` for formatting, and `make clean` for declared generated files. Build and test evidence stays in `.artifacts/verification`.
 
-Contributor tool versions and task entry points live in the native Mise configuration. Use `mise run lint` for source checks, `mise run test` for the applicable behavioral tests, and `mise run check` for the complete supported gate. `mise run clean` removes declared generated outputs while preserving source, credentials and retained data. This package has no separate Mise development service; use its native entry points directly.
+`make test:e2e` runs the browser acceptance gate using the caller-local, locked Playwright SDK and pinned Chromium installed by `make setup`.
 
 ## Finite machine commands
 

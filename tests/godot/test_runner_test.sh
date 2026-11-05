@@ -2,7 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-RUNNER="$ROOT_DIR/tests/godot/test.sh"
+run_suite() {
+    python3 "$TOOLS_ROOT/helpers/godot-test.py" \
+        --binary "${GODOT_BIN:-godot}" --project "${GD_TEST_PROJECT_DIR:-$ROOT_DIR}" \
+        --directory "$GD_TEST_SCRIPT_DIR" --sentinel-prefix 'PASS gd-playwright' \
+        --timeout "${GD_TEST_TIMEOUT_SECONDS:-30}"
+}
 TEMP=$(mktemp -d)
 trap 'rm -rf "$TEMP"' EXIT
 SCRIPTS="$TEMP/scripts"
@@ -22,7 +27,7 @@ EOF
     chmod +x "$TEMP/fake-godot"
     set +e
     output=$(GD_TEST_SCRIPT_DIR="$SCRIPTS" GD_TEST_PROJECT_DIR="$TEMP" \
-        GD_TEST_TIMEOUT_SECONDS=1 GODOT_BIN="$TEMP/fake-godot" "$RUNNER" 2>&1)
+        GD_TEST_TIMEOUT_SECONDS=1 GODOT_BIN="$TEMP/fake-godot" run_suite 2>&1)
     status=$?
     set -e
     if [ "$expected" = pass ] && [ "$status" -ne 0 ]; then
@@ -47,7 +52,7 @@ run_control duplicate_sentinel fail 'printf "%s\n" "PASS gd-playwright control_t
 rm -f "$SCRIPTS"/*_test.gd
 set +e
 missing_output=$(GD_TEST_SCRIPT_DIR="$SCRIPTS" GD_TEST_PROJECT_DIR="$TEMP" \
-    GODOT_BIN="$TEMP/fake-godot" "$RUNNER" 2>&1)
+    GODOT_BIN="$TEMP/fake-godot" run_suite 2>&1)
 missing_status=$?
 set -e
 if [ "$missing_status" -eq 0 ]; then
