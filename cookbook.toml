@@ -2,8 +2,6 @@ version = 1
 recipe = "godot-addon"
 
 [package]
-source = "addon"
-manifest = "package.files"
 archive = "dist/@aviorstudio_gd-playwright.zip"
 
 [lint]
@@ -46,7 +44,7 @@ tag_prefix = "gd-v"
 initial = "first"
 
 [node]
-packages = ["tests/browser"]
+packages = [{directory = "tests/browser", manager = "npm"}]
 
 [components.browser]
 package = "tests/browser"
