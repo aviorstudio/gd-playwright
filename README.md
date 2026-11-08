@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 3d46396eb71df9b3fb6768f2a432a6b2335ecac3c8d10f5af3122aabe7906f69 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 041e30ff156d7b5965e18f5fe5b2eecf2f4a914e3d24e0a117bf0af01ae6b539 -->
 
 # gd-playwright
 
@@ -288,16 +288,16 @@ See `LICENSE`.
 Install [mise](https://mise.jdx.dev/) and GNU Make, then run:
 
 ```sh
-make setup
-make build
-make test
+mise run setup
+mise run build
+mise run test
 ```
 
-`mise.toml` pins SDK versions. `cookbook.toml` declares the addon package and its real tests; the generated Make entrypoint uses an exact shared cookbook revision from `nicodes/tools`. Setup installs the pinned editor, export templates and applicable dependencies. Build creates and verifies the closed addon archive; tests run source checks, native assertions, security checks and the declared packaged integration or browser checks. Packaged tests require the current verified build. Test commands do not run setup or rebuild the addon.
+`mise.toml` pins SDK versions. `cookbook.toml` declares the addon package and its real tests; the canonical generated Mise task block uses an exact Cookbook revision from `nicodes/cookbook`. Setup installs the pinned editor, export templates and applicable dependencies. Build creates and verifies the closed addon archive; tests run source checks, native assertions, security checks and the declared packaged integration or browser checks. Packaged tests require the current verified build. Test commands do not run setup or rebuild the addon.
 
-`make help` lists the available commands. Use `make test:lint`, `make test:unit`, `make test:integration` or `make test:security` for an individual group, `make fmt` for formatting, and `make clean` for declared generated files. Build and test evidence stays in `.artifacts/verification`.
+`mise run help` lists the available commands. Use `mise run test:lint`, `mise run test:unit`, `mise run test:integration` or `mise run test:security` for an individual group, `mise run fmt` for formatting, and `mise run clean` for declared generated files. Build and test evidence stays in `.artifacts/verification`.
 
-`make test:e2e` runs the browser acceptance gate using the caller-local, locked Playwright SDK and pinned Chromium installed by `make setup`.
+`mise run test:e2e` runs the browser acceptance gate using the caller-local, locked Playwright SDK and pinned Chromium installed by `mise run setup`.
 
 ## Finite machine commands
 
