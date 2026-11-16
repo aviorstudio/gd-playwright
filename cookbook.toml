@@ -51,4 +51,4 @@ package = "tests/browser"
 cli_version = "0.1.18"
 
 [ci]
-runner = "ubuntu-22.04"
+runner = "ubuntu-24.04"
