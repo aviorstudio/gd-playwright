@@ -7,34 +7,47 @@ if [ "$#" -ne 1 ]; then
 fi
 GODOT="${GODOT_BIN:-godot}"
 PLAYWRIGHT="${PLAYWRIGHT_CLI_BIN:-playwright-cli}"
-# Ubuntu's AppArmor policy restricts user namespaces for downloaded Chromium.
-# Keep Chromium's sandbox using the runner's root-owned Google Chrome helper.
-if [[ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] &&
-    [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" == 1 ]]; then
-    CHROME_DEVEL_SANDBOX=/opt/google/chrome/chrome-sandbox
-    python3 -I -B - "$CHROME_DEVEL_SANDBOX" <<'PY'
-import os
-import stat
-import sys
-info = os.lstat(sys.argv[1])
-if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or stat.S_IMODE(info.st_mode) != 0o4755:
-    raise SystemExit('Chromium requires the reviewed root-owned setuid sandbox helper')
-PY
-    export CHROME_DEVEL_SANDBOX
-fi
 ARCHIVE="$1"
 OUTPUT_DIR="${GD_WEB_OUTPUT_DIR:-$(mktemp -d)}"
 TEMP="${GD_WEB_TEMP_DIR:-$(mktemp -d)}"
 mkdir -p "$TEMP"
 SERVER_PID=""
+APPARMOR_PROFILE=""
 SESSION="gd-playwright-web-$$"
 cleanup() {
     "$PLAYWRIGHT" -s="$SESSION" close >/dev/null 2>&1 || true
+    if [ -n "$APPARMOR_PROFILE" ]; then sudo -n apparmor_parser -R "$APPARMOR_PROFILE" >/dev/null 2>&1 || true; fi
     if [ -n "$SERVER_PID" ]; then kill "$SERVER_PID" >/dev/null 2>&1 || true; fi
     if [ -z "${GD_WEB_TEMP_DIR:-}" ]; then rm -rf "$TEMP"; fi
     if [ -z "${GD_WEB_OUTPUT_DIR:-}" ]; then rm -rf "$OUTPUT_DIR"; fi
 }
 trap cleanup EXIT
+# Allow only this job's prepared Chromium executables to create their sandbox
+# namespaces. Keep the host restriction and Chromium sandbox enabled.
+if [[ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] &&
+    [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" == 1 ]]; then
+    APPARMOR_PROFILE="$TEMP/chromium-userns.profile"
+    python3 -I -B - "$APPARMOR_PROFILE" <<'PYPROFILE'
+import os
+from pathlib import Path
+import re
+import sys
+import uuid
+root = Path(os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '.artifacts/playwright')).resolve(strict=True)
+binaries = sorted(path for path in root.rglob('*')
+    if path.name in {'chrome', 'chrome-headless-shell'} and path.is_file() and os.access(path, os.X_OK))
+if not 1 <= len(binaries) <= 2:
+    raise SystemExit('Expected the locked Chromium browser and optional headless shell')
+profiles = ['abi <abi/4.0>,', 'include <tunables/global>']
+name = 'gd-playwright-ci-' + uuid.uuid4().hex
+for number, path in enumerate(binaries):
+    if path.is_symlink() or not path.resolve().is_relative_to(root) or not re.fullmatch(r'/[A-Za-z0-9_./@ +:-]+', str(path)):
+        raise SystemExit('Chromium sandbox requires exact regular executable paths')
+    profiles.append(f'profile {name}-{number} "{path}" flags=(unconfined) {{ userns, }}')
+Path(sys.argv[1]).write_text('\n'.join(profiles) + '\n', encoding='utf-8')
+PYPROFILE
+    sudo -n apparmor_parser -r "$APPARMOR_PROFILE"
+fi
 PROJECT="$TEMP/project"
 mkdir -p "$PROJECT/addons/@aviorstudio_gd-playwright" "$OUTPUT_DIR/ordinary" "$OUTPUT_DIR/diagnostic"
 python3 - "$ARCHIVE" "$PROJECT/addons/@aviorstudio_gd-playwright" <<'PY'
