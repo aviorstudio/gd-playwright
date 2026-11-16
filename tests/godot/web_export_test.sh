@@ -7,6 +7,21 @@ if [ "$#" -ne 1 ]; then
 fi
 GODOT="${GODOT_BIN:-godot}"
 PLAYWRIGHT="${PLAYWRIGHT_CLI_BIN:-playwright-cli}"
+# Ubuntu's AppArmor policy restricts user namespaces for downloaded Chromium.
+# Keep Chromium's sandbox using the runner's root-owned Google Chrome helper.
+if [[ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] &&
+    [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" == 1 ]]; then
+    CHROME_DEVEL_SANDBOX=/opt/google/chrome/chrome-sandbox
+    python3 -I -B - "$CHROME_DEVEL_SANDBOX" <<'PY'
+import os
+import stat
+import sys
+info = os.lstat(sys.argv[1])
+if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or stat.S_IMODE(info.st_mode) != 0o4755:
+    raise SystemExit('Chromium requires the reviewed root-owned setuid sandbox helper')
+PY
+    export CHROME_DEVEL_SANDBOX
+fi
 ARCHIVE="$1"
 OUTPUT_DIR="${GD_WEB_OUTPUT_DIR:-$(mktemp -d)}"
 TEMP="${GD_WEB_TEMP_DIR:-$(mktemp -d)}"
